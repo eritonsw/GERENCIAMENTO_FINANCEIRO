@@ -1,8 +1,6 @@
 async function load() {
   try {
-    const res = await fetch(API_URL, {
-      method: 'GET'
-    });
+    const res = await fetch(API_URL);
 
     if (!res.ok) {
       throw new Error(`Erro HTTP ${res.status}`);
@@ -144,12 +142,12 @@ async function salvar() {
   };
 
   try {
+    const formData = new URLSearchParams();
+    formData.append('payload', JSON.stringify(payload));
+
     const res = await fetch(API_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
+      body: formData
     });
 
     if (!res.ok) {
@@ -167,7 +165,7 @@ async function salvar() {
     await load();
   } catch (error) {
     console.error('Erro ao salvar lançamento:', error);
-    alert('Erro ao salvar lançamento.');
+    alert(`Erro ao salvar lançamento: ${error.message}`);
   }
 }
 
