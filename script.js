@@ -1,6 +1,15 @@
 async function load() {
   try {
-    const res = await fetch(API_URL);
+    const url = new URL(API_URL);
+    const mes = document.getElementById('filtroMes')?.value || '';
+    const dataInicio = document.getElementById('filtroInicio')?.value || '';
+    const dataFim = document.getElementById('filtroFim')?.value || '';
+
+    if (mes) url.searchParams.set('mes', mes);
+    if (dataInicio) url.searchParams.set('dataInicio', dataInicio);
+    if (dataFim) url.searchParams.set('dataFim', dataFim);
+
+    const res = await fetch(url.toString());
 
     if (!res.ok) {
       throw new Error(`Erro HTTP ${res.status}`);
@@ -16,16 +25,7 @@ async function load() {
     renderVencimentos(Array.isArray(data?.vencimentos) ? data.vencimentos : []);
   } catch (error) {
     console.error('Erro ao carregar dados:', error);
-
-    document.getElementById('saldo').innerText = 'Erro';
-    document.getElementById('receitas').innerText = 'Erro';
-    document.getElementById('despesas').innerText = 'Erro';
-
-    document.getElementById('lancamentos').innerHTML =
-      '<li class="empty-state">Erro ao carregar lançamentos.</li>';
-
-    document.getElementById('vencimentos').innerHTML =
-      '<li class="empty-state">Erro ao carregar vencimentos.</li>';
+    showToast('Erro ao carregar dados.', 'error');
   }
 }
 
@@ -45,6 +45,7 @@ function renderLancamentos(lancamentos) {
     const descricao = lancamento?.descricao ?? 'Sem descrição';
     const valor = lancamento?.valor ?? '0,00';
     const data = lancamento?.data ? formatDate(lancamento.data) : '';
+    const status = lancamento?.status ?? '';
     const tipoClasse = tipo === 'receita' ? 'receita' : 'despesa';
     const tipoTexto = tipo === 'receita' ? 'Receita' : 'Despesa';
 
@@ -52,11 +53,19 @@ function renderLancamentos(lancamentos) {
       <div class="item-row">
         <div class="item-main">
           <span class="item-title">${escapeHtml(descricao)}</span>
-          <span class="item-subtitle">${tipoTexto}${data ? ` • ${escapeHtml(data)}` : ''}</span>
+          <span class="item-subtitle">${tipoTexto}${data ? ` • ${escapeHtml(data)}` : ''} • ${escapeHtml(status)}</span>
         </div>
-        <span class="item-value ${tipoClasse}">
-          ${tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(valor))}
-        </span>
+        <div class="item-actions">
+          <span class="item-value ${tipoClasse}">
+            ${tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(valor))}
+          </span>
+          ${tipo === 'despesa' && status !== 'pago'
+            ? `<button class="mini-btn" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','pago')">Marcar pago</button>`
+            : ''}
+          ${tipo === 'receita' && status !== 'recebido'
+            ? `<button class="mini-btn" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','recebido')">Marcar recebido</button>`
+            : ''}
+        </div>
       </div>
     `;
 
@@ -103,8 +112,21 @@ function renderVencimentos(vencimentos) {
   });
 }
 
+function aplicarFiltros() {
+  load();
+}
+
+function limparFiltros() {
+  document.getElementById('filtroMes').value = '';
+  document.getElementById('filtroInicio').value = '';
+  document.getElementById('filtroFim').value = '';
+  load();
+}
+
 function openModal() {
   document.getElementById('modal').classList.remove('hidden');
+  const hoje = new Date().toISOString().slice(0, 10);
+  document.getElementById('dataLancamento').value = hoje;
 }
 
 function closeModal() {
@@ -115,30 +137,45 @@ function limparFormulario() {
   document.getElementById('desc').value = '';
   document.getElementById('valor').value = '';
   document.getElementById('tipo').value = 'receita';
+  document.getElementById('categoria').value = '';
+  document.getElementById('status').value = 'pendente';
+  document.getElementById('dataLancamento').value = '';
+  document.getElementById('vencimento').value = '';
 }
 
 async function salvar() {
   const descricao = document.getElementById('desc').value.trim();
   const valor = document.getElementById('valor').value.trim();
   const tipo = document.getElementById('tipo').value;
+  const data = document.getElementById('dataLancamento').value;
+  const vencimento = document.getElementById('vencimento').value;
+  const categoria = document.getElementById('categoria').value.trim() || 'Outros';
+  let status = document.getElementById('status').value;
 
-  if (!descricao || !valor) {
-    alert('Preencha descrição e valor.');
+  if (!descricao || !valor || !data) {
+    showToast('Preencha descrição, valor e data.', 'error');
     return;
   }
 
   const valorNumero = Number(valor);
 
   if (Number.isNaN(valorNumero) || valorNumero <= 0) {
-    alert('Informe um valor válido maior que zero.');
+    showToast('Informe um valor válido maior que zero.', 'error');
     return;
   }
+
+  if (tipo === 'receita' && status === 'pago') status = 'recebido';
+  if (tipo === 'despesa' && status === 'recebido') status = 'pago';
 
   const payload = {
     action: 'addLancamento',
     descricao,
     valor: valorNumero,
-    tipo
+    tipo,
+    data,
+    vencimento,
+    categoria,
+    status
   };
 
   try {
@@ -154,19 +191,65 @@ async function salvar() {
       throw new Error(`Erro HTTP ${res.status}`);
     }
 
-    const data = await res.json();
+    const dataResp = await res.json();
 
-    if (data?.status && data.status !== 'ok') {
-      throw new Error(data.message || 'Falha ao salvar lançamento.');
+    if (dataResp?.status !== 'ok') {
+      throw new Error(dataResp.message || 'Falha ao salvar.');
     }
 
     limparFormulario();
     closeModal();
+    showToast('Lançamento salvo com sucesso.', 'success');
     await load();
   } catch (error) {
-    console.error('Erro ao salvar lançamento:', error);
-    alert(`Erro ao salvar lançamento: ${error.message}`);
+    console.error('Erro ao salvar:', error);
+    showToast(`Erro ao salvar: ${error.message}`, 'error');
   }
+}
+
+async function atualizarStatus(id, status) {
+  try {
+    const payload = {
+      action: 'updateStatus',
+      id,
+      status
+    };
+
+    const formData = new URLSearchParams();
+    formData.append('payload', JSON.stringify(payload));
+
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!res.ok) {
+      throw new Error(`Erro HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    if (data?.status !== 'ok') {
+      throw new Error(data.message || 'Falha ao atualizar status.');
+    }
+
+    showToast('Status atualizado.', 'success');
+    await load();
+  } catch (error) {
+    console.error(error);
+    showToast(`Erro ao atualizar status: ${error.message}`, 'error');
+  }
+}
+
+function showToast(message, type = 'success') {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = `toast ${type}`;
+  toast.classList.remove('hidden');
+
+  setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 2500);
 }
 
 function formatDate(value) {
