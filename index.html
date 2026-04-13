@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Financeiro Pessoal</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="Style.css">
 </head>
 <body>
 
@@ -17,6 +17,34 @@
     </header>
 
     <main class="container">
+      <section class="panel filters-panel">
+        <div class="panel-header">
+          <h2>🔎 Filtros</h2>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="filtroMes">Mês</label>
+            <input id="filtroMes" type="month">
+          </div>
+
+          <div class="form-group">
+            <label for="filtroInicio">Data inicial</label>
+            <input id="filtroInicio" type="date">
+          </div>
+
+          <div class="form-group">
+            <label for="filtroFim">Data final</label>
+            <input id="filtroFim" type="date">
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn btn-primary" type="button" onclick="aplicarFiltros()">Aplicar</button>
+          <button class="btn btn-secondary" type="button" onclick="limparFiltros()">Limpar</button>
+        </div>
+      </section>
+
       <section id="dashboard" class="dashboard-grid">
         <div class="summary-card balance">
           <span class="card-label">Saldo atual</span>
@@ -55,9 +83,7 @@
       </section>
     </main>
 
-    <button type="button" class="fab" onclick="openModal()" aria-label="Novo lançamento">
-      +
-    </button>
+    <button type="button" class="fab" onclick="openModal()" aria-label="Novo lançamento">+</button>
   </div>
 
   <div id="modal" class="modal hidden">
@@ -87,12 +113,42 @@
         </div>
       </div>
 
+      <div class="form-row">
+        <div class="form-group">
+          <label for="dataLancamento">Data</label>
+          <input id="dataLancamento" type="date">
+        </div>
+
+        <div class="form-group">
+          <label for="vencimento">Vencimento</label>
+          <input id="vencimento" type="date">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="categoria">Categoria</label>
+          <input id="categoria" type="text" placeholder="Ex: Mercado">
+        </div>
+
+        <div class="form-group">
+          <label for="status">Status</label>
+          <select id="status">
+            <option value="pendente">Pendente</option>
+            <option value="pago">Pago</option>
+            <option value="recebido">Recebido</option>
+          </select>
+        </div>
+      </div>
+
       <div class="modal-actions">
         <button type="button" class="btn btn-primary" onclick="salvar()">Salvar</button>
         <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       </div>
     </div>
   </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <script src="config.js"></script>
   <script src="script.js"></script>
