@@ -24,12 +24,10 @@ async function load() {
     document.getElementById('despesas').innerText = 'Erro';
 
     document.getElementById('lancamentos').innerHTML =
-      '<li>Erro ao carregar lançamentos.</li>';
+      '<li class="empty-state">Erro ao carregar lançamentos.</li>';
 
     document.getElementById('vencimentos').innerHTML =
-      '<li>Erro ao carregar vencimentos.</li>';
-
-    alert('Erro ao carregar dados do sistema.');
+      '<li class="empty-state">Erro ao carregar vencimentos.</li>';
   }
 }
 
@@ -38,18 +36,32 @@ function renderLancamentos(lancamentos) {
   lista.innerHTML = '';
 
   if (!lancamentos.length) {
-    lista.innerHTML = '<li>Nenhum lançamento encontrado.</li>';
+    lista.innerHTML = '<li class="empty-state">Nenhum lançamento encontrado.</li>';
     return;
   }
 
   lancamentos.forEach((lancamento) => {
     const li = document.createElement('li');
-    const descricao = lancamento?.descricao ?? 'Sem descrição';
-    const valor = lancamento?.valor ?? 0;
-    const tipo = lancamento?.tipo ?? '';
-    const data = lancamento?.data ? ` | ${formatDate(lancamento.data)}` : '';
 
-    li.innerText = `${descricao} - R$ ${valor}${tipo ? ` (${tipo})` : ''}${data}`;
+    const tipo = lancamento?.tipo ?? '';
+    const descricao = lancamento?.descricao ?? 'Sem descrição';
+    const valor = lancamento?.valor ?? '0,00';
+    const data = lancamento?.data ? formatDate(lancamento.data) : '';
+    const tipoClasse = tipo === 'receita' ? 'receita' : 'despesa';
+    const tipoTexto = tipo === 'receita' ? 'Receita' : 'Despesa';
+
+    li.innerHTML = `
+      <div class="item-row">
+        <div class="item-main">
+          <span class="item-title">${escapeHtml(descricao)}</span>
+          <span class="item-subtitle">${tipoTexto}${data ? ` • ${escapeHtml(data)}` : ''}</span>
+        </div>
+        <span class="item-value ${tipoClasse}">
+          ${tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(valor))}
+        </span>
+      </div>
+    `;
+
     lista.appendChild(li);
   });
 }
@@ -59,17 +71,36 @@ function renderVencimentos(vencimentos) {
   lista.innerHTML = '';
 
   if (!vencimentos.length) {
-    lista.innerHTML = '<li>Nenhum vencimento próximo.</li>';
+    lista.innerHTML = '<li class="empty-state">Nenhum vencimento próximo.</li>';
     return;
   }
 
   vencimentos.forEach((item) => {
     const li = document.createElement('li');
+
     const descricao = item?.descricao ?? 'Conta';
     const vencimento = item?.vencimento ?? 'Sem data';
-    const valor = item?.valor ? ` - R$ ${item.valor}` : '';
+    const valor = item?.valor ? `R$ ${item.valor}` : 'Valor não informado';
+    const nivel = item?.nivel ?? 'normal';
 
-    li.innerText = `${descricao} - vence em ${vencimento}${valor}`;
+    li.classList.add(
+      nivel === 'danger'
+        ? 'vencimento-danger'
+        : nivel === 'warning'
+        ? 'vencimento-warning'
+        : 'vencimento-normal'
+    );
+
+    li.innerHTML = `
+      <div class="item-row">
+        <div class="item-main">
+          <span class="item-title">${escapeHtml(descricao)}</span>
+          <span class="item-subtitle">Vence em ${escapeHtml(vencimento)}</span>
+        </div>
+        <span class="item-value despesa">${escapeHtml(valor)}</span>
+      </div>
+    `;
+
     lista.appendChild(li);
   });
 }
@@ -126,7 +157,10 @@ async function salvar() {
     }
 
     const data = await res.json();
-    console.log('Resposta do servidor:', data);
+
+    if (data?.status && data.status !== 'ok') {
+      throw new Error(data.message || 'Falha ao salvar lançamento.');
+    }
 
     limparFormulario();
     closeModal();
@@ -141,11 +175,26 @@ function formatDate(value) {
   try {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
-
     return date.toLocaleDateString('pt-BR');
   } catch {
     return value;
   }
 }
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#039;');
+}
+
+window.addEventListener('click', function (event) {
+  const modal = document.getElementById('modal');
+  if (event.target === modal) {
+    closeModal();
+  }
+});
 
 load();
