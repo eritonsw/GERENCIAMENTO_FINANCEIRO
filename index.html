@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financeiro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+  <h1>💰 Financeiro</h1>
+  <button onclick="openModal()">+ Lançamento</button>
+</header>
+
+<section id="dashboard">
+  <div class="card">Saldo: <span id="saldo">R$ 0</span></div>
+  <div class="card">Receitas: <span id="receitas">R$ 0</span></div>
+  <div class="card">Despesas: <span id="despesas">R$ 0</span></div>
+</section>
+
+<section>
+  <h2>📅 Próximos vencimentos</h2>
+  <ul id="vencimentos"></ul>
+</section>
+
+<section>
+  <h2>📋 Lançamentos recentes</h2>
+  <ul id="lancamentos"></ul>
+</section>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-content">
+    <h2>Novo lançamento</h2>
+    <input id="desc" placeholder="Descrição">
+    <input id="valor" type="number" placeholder="Valor">
+    <select id="tipo">
+      <option value="receita">Receita</option>
+      <option value="despesa">Despesa</option>
+    </select>
+    <button onclick="salvar()">Salvar</button>
+    <button onclick="closeModal()">Cancelar</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
