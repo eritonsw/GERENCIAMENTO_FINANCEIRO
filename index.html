@@ -3,51 +3,93 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Financeiro</title>
+  <title>Financeiro Pessoal</title>
   <link rel="stylesheet" href="Style.css">
 </head>
 <body>
 
-  <header>
-    <h1>💰 Financeiro Pessoal</h1>
-    <button type="button" onclick="openModal()">+ Lançamento</button>
-  </header>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Controle financeiro</p>
+        <h1>💰 Financeiro Pessoal</h1>
+      </div>
+    </header>
 
-  <section id="dashboard">
-    <div class="card">Saldo: <span id="saldo">R$ 0,00</span></div>
-    <div class="card">Receitas: <span id="receitas">R$ 0,00</span></div>
-    <div class="card">Despesas: <span id="despesas">R$ 0,00</span></div>
-  </section>
+    <main class="container">
+      <section id="dashboard" class="dashboard-grid">
+        <div class="summary-card balance">
+          <span class="card-label">Saldo atual</span>
+          <strong id="saldo">R$ 0,00</strong>
+        </div>
 
-  <section>
-    <h2>📅 Próximos vencimentos</h2>
-    <ul id="vencimentos">
-      <li>Nenhum vencimento carregado.</li>
-    </ul>
-  </section>
+        <div class="summary-card income">
+          <span class="card-label">Receitas</span>
+          <strong id="receitas">R$ 0,00</strong>
+        </div>
 
-  <section>
-    <h2>📋 Lançamentos recentes</h2>
-    <ul id="lancamentos">
-      <li>Carregando...</li>
-    </ul>
-  </section>
+        <div class="summary-card expense">
+          <span class="card-label">Despesas</span>
+          <strong id="despesas">R$ 0,00</strong>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>📅 Próximos vencimentos</h2>
+          <span class="panel-badge">alertas</span>
+        </div>
+        <ul id="vencimentos" class="styled-list">
+          <li class="empty-state">Nenhum vencimento próximo.</li>
+        </ul>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>📋 Lançamentos recentes</h2>
+          <span class="panel-badge">últimos</span>
+        </div>
+        <ul id="lancamentos" class="styled-list">
+          <li class="empty-state">Carregando...</li>
+        </ul>
+      </section>
+    </main>
+
+    <button type="button" class="fab" onclick="openModal()" aria-label="Novo lançamento">
+      +
+    </button>
+  </div>
 
   <div id="modal" class="modal hidden">
     <div class="modal-content">
-      <h2>Novo lançamento</h2>
+      <div class="modal-header">
+        <h2>Novo lançamento</h2>
+        <button type="button" class="icon-close" onclick="closeModal()">×</button>
+      </div>
 
-      <input id="desc" type="text" placeholder="Descrição" maxlength="120">
-      <input id="valor" type="number" step="0.01" min="0" placeholder="Valor">
+      <div class="form-group">
+        <label for="desc">Descrição</label>
+        <input id="desc" type="text" placeholder="Ex: Mercado, salário, internet" maxlength="120">
+      </div>
 
-      <select id="tipo">
-        <option value="receita">Receita</option>
-        <option value="despesa">Despesa</option>
-      </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="valor">Valor</label>
+          <input id="valor" type="number" step="0.01" min="0" placeholder="0,00">
+        </div>
+
+        <div class="form-group">
+          <label for="tipo">Tipo</label>
+          <select id="tipo">
+            <option value="receita">Receita</option>
+            <option value="despesa">Despesa</option>
+          </select>
+        </div>
+      </div>
 
       <div class="modal-actions">
-        <button type="button" onclick="salvar()">Salvar</button>
-        <button type="button" class="secondary" onclick="closeModal()">Cancelar</button>
+        <button type="button" class="btn btn-primary" onclick="salvar()">Salvar</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       </div>
     </div>
   </div>
