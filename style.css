@@ -416,3 +416,17 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+.panel-actions {
+  margin-top: 12px;
+}
+
+.filters-panel .form-row {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+@media (max-width: 699px) {
+  .filters-panel .form-row,
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
