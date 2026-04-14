@@ -167,48 +167,56 @@
   </div>
 </div>
 
-  <div id="fixaModal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Nova despesa fixa</h2>
-        <button type="button" class="icon-close" onclick="closeFixaModal()">×</button>
+ <div id="fixaModal" class="modal hidden">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 id="fixaModalTitle">Nova despesa fixa</h2>
+      <button type="button" class="icon-close" onclick="closeFixaModal()">×</button>
+    </div>
+
+    <div class="form-group">
+      <label for="fixaDesc">Descrição</label>
+      <input id="fixaDesc" type="text" placeholder="Ex: Cartão Nubank">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fixaCategoria">Categoria</label>
+        <select id="fixaCategoria"></select>
       </div>
 
       <div class="form-group">
-        <label for="fixaDesc">Descrição</label>
-        <input id="fixaDesc" type="text" placeholder="Ex: Cartão Nubank">
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="fixaCategoria">Categoria</label>
-          <select id="fixaCategoria"></select>
-        </div>
-
-        <div class="form-group">
-          <label for="fixaValor">Valor padrão</label>
-          <input id="fixaValor" type="number" step="0.01" min="0" placeholder="0,00">
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="fixaDia">Dia do vencimento</label>
-          <input id="fixaDia" type="number" min="1" max="31" placeholder="Ex: 10">
-        </div>
-
-        <div class="form-group">
-          <label for="fixaObs">Observação</label>
-          <input id="fixaObs" type="text" placeholder="Opcional">
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button type="button" class="btn btn-primary" onclick="salvarFixa()">Salvar</button>
-        <button type="button" class="btn btn-secondary" onclick="closeFixaModal()">Cancelar</button>
+        <label for="fixaValor">Valor padrão</label>
+        <input id="fixaValor" type="number" step="0.01" min="0" placeholder="0,00">
       </div>
     </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="fixaDia">Dia do vencimento</label>
+        <input id="fixaDia" type="number" min="1" max="31" placeholder="Ex: 10">
+      </div>
+
+      <div class="form-group">
+        <label for="fixaAtivo">Ativo</label>
+        <select id="fixaAtivo">
+          <option value="sim">Sim</option>
+          <option value="nao">Não</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="fixaObs">Observação</label>
+      <input id="fixaObs" type="text" placeholder="Opcional">
+    </div>
+
+    <div class="modal-actions">
+      <button id="saveFixaButton" type="button" class="btn btn-primary" onclick="salvarFixa()">Salvar</button>
+      <button type="button" class="btn btn-secondary" onclick="closeFixaModal()">Cancelar</button>
+    </div>
   </div>
+</div>
 
   <div id="toast" class="toast hidden"></div>
 
