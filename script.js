@@ -1,4 +1,5 @@
 let categoriasCache = [];
+let lancamentoEditandoId = null;
 
 async function apiGet(params = {}) {
   const url = new URL(API_URL);
@@ -9,10 +10,7 @@ async function apiGet(params = {}) {
   });
 
   const res = await fetch(url.toString());
-  if (!res.ok) {
-    throw new Error(`Erro HTTP ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
   return await res.json();
 }
 
@@ -25,10 +23,7 @@ async function apiPost(payload) {
     body: formData
   });
 
-  if (!res.ok) {
-    throw new Error(`Erro HTTP ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
   return await res.json();
 }
 
@@ -76,7 +71,6 @@ async function carregarCategorias() {
   }
 
   categoriasCache = Array.isArray(data?.categorias) ? data.categorias : [];
-
   preencherSelectCategorias('categoria');
   preencherSelectCategorias('fixaCategoria');
 }
@@ -86,7 +80,6 @@ function preencherSelectCategorias(id) {
   if (!select) return;
 
   select.innerHTML = '';
-
   categoriasCache.forEach(cat => {
     const option = document.createElement('option');
     option.value = cat;
@@ -140,12 +133,20 @@ function renderLancamentos(lancamentos) {
           <span class="item-value ${tipoClasse}">
             ${tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(valor))}
           </span>
-          ${tipo === 'despesa' && status !== 'pago'
-            ? `<button class="mini-btn" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','pago')">Marcar pago</button>`
-            : ''}
-          ${tipo === 'receita' && status !== 'recebido'
-            ? `<button class="mini-btn" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','recebido')">Marcar recebido</button>`
-            : ''}
+
+          <div class="action-buttons">
+            <button class="mini-btn" onclick='editarLancamento(${JSON.stringify(lancamento)})'>Editar</button>
+
+            ${tipo === 'despesa' && status !== 'pago'
+              ? `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','pago')">Marcar pago</button>`
+              : ''}
+
+            ${tipo === 'receita' && status !== 'recebido'
+              ? `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','recebido')">Marcar recebido</button>`
+              : ''}
+
+            <button class="mini-btn danger" onclick="excluirLancamento('${escapeHtml(lancamento.id)}')">Excluir</button>
+          </div>
         </div>
       </div>
     `;
@@ -203,6 +204,9 @@ function renderFixas(fixas) {
   }
 
   fixas.forEach((fixa) => {
+    const valorNum = Number(fixa.valor_padrao || 0);
+    const valorTexto = Number.isNaN(valorNum) ? '0,00' : valorNum.toFixed(2).replace('.', ',');
+
     const li = document.createElement('li');
     li.innerHTML = `
       <div class="item-row">
@@ -210,7 +214,7 @@ function renderFixas(fixas) {
           <span class="item-title">${escapeHtml(fixa.descricao || '')}</span>
           <span class="item-subtitle">${escapeHtml(fixa.categoria || '')} • dia ${escapeHtml(String(fixa.dia_vencimento || ''))}</span>
         </div>
-        <span class="item-value despesa">R$ ${escapeHtml(Number(fixa.valor_padrao || 0).toFixed(2).replace('.', ','))}</span>
+        <span class="item-value despesa">R$ ${valorTexto}</span>
       </div>
     `;
     lista.appendChild(li);
@@ -230,6 +234,10 @@ function limparFiltros() {
 
 function openModal() {
   document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modalTitle').textContent = 'Novo lançamento';
+  document.getElementById('saveButton').textContent = 'Salvar';
+  lancamentoEditandoId = null;
+
   const hoje = new Date().toISOString().slice(0, 10);
   document.getElementById('dataLancamento').value = hoje;
 }
@@ -250,18 +258,40 @@ function limparFormulario() {
   document.getElementById('desc').value = '';
   document.getElementById('valor').value = '';
   document.getElementById('tipo').value = 'receita';
-  document.getElementById('categoria').selectedIndex = 0;
+  if (document.getElementById('categoria').options.length) {
+    document.getElementById('categoria').selectedIndex = 0;
+  }
   document.getElementById('status').value = 'pendente';
   document.getElementById('dataLancamento').value = '';
   document.getElementById('vencimento').value = '';
+  document.getElementById('observacoes').value = '';
+  lancamentoEditandoId = null;
 }
 
 function limparFormularioFixa() {
   document.getElementById('fixaDesc').value = '';
-  document.getElementById('fixaCategoria').selectedIndex = 0;
+  if (document.getElementById('fixaCategoria').options.length) {
+    document.getElementById('fixaCategoria').selectedIndex = 0;
+  }
   document.getElementById('fixaValor').value = '';
   document.getElementById('fixaDia').value = '';
   document.getElementById('fixaObs').value = '';
+}
+
+function editarLancamento(lancamento) {
+  lancamentoEditandoId = lancamento.id;
+  document.getElementById('modal').classList.remove('hidden');
+  document.getElementById('modalTitle').textContent = 'Editar lançamento';
+  document.getElementById('saveButton').textContent = 'Atualizar';
+
+  document.getElementById('desc').value = lancamento.descricao || '';
+  document.getElementById('valor').value = (lancamento.valor || '0,00').replace(',', '.');
+  document.getElementById('tipo').value = lancamento.tipo || 'despesa';
+  document.getElementById('dataLancamento').value = lancamento.data || '';
+  document.getElementById('vencimento').value = lancamento.vencimento || '';
+  document.getElementById('categoria').value = lancamento.categoria || 'Outros';
+  document.getElementById('status').value = lancamento.status || 'pendente';
+  document.getElementById('observacoes').value = lancamento.observacoes || '';
 }
 
 async function salvar() {
@@ -271,6 +301,7 @@ async function salvar() {
   const data = document.getElementById('dataLancamento').value;
   const vencimento = document.getElementById('vencimento').value;
   const categoria = document.getElementById('categoria').value || 'Outros';
+  const observacoes = document.getElementById('observacoes').value.trim();
   let status = document.getElementById('status').value;
 
   if (!descricao || !valor || !data) {
@@ -288,16 +319,20 @@ async function salvar() {
   if (tipo === 'despesa' && status === 'recebido') status = 'pago';
 
   try {
-    const dataResp = await apiPost({
-      action: 'addLancamento',
+    const payload = {
       descricao,
       valor: valorNumero,
       tipo,
       data,
       vencimento,
       categoria,
-      status
-    });
+      status,
+      observacoes
+    };
+
+    const dataResp = lancamentoEditandoId
+      ? await apiPost({ action: 'updateLancamento', id: lancamentoEditandoId, ...payload })
+      : await apiPost({ action: 'addLancamento', ...payload });
 
     if (dataResp?.status !== 'ok') {
       throw new Error(dataResp.message || 'Falha ao salvar.');
@@ -305,7 +340,7 @@ async function salvar() {
 
     limparFormulario();
     closeModal();
-    showToast('Lançamento salvo com sucesso.', 'success');
+    showToast(lancamentoEditandoId ? 'Lançamento atualizado.' : 'Lançamento salvo com sucesso.', 'success');
     await load();
   } catch (error) {
     console.error(error);
@@ -357,11 +392,7 @@ async function salvarFixa() {
 
 async function atualizarStatus(id, status) {
   try {
-    const resp = await apiPost({
-      action: 'updateStatus',
-      id,
-      status
-    });
+    const resp = await apiPost({ action: 'updateStatus', id, status });
 
     if (resp?.status !== 'ok') {
       throw new Error(resp.message || 'Falha ao atualizar status.');
@@ -372,6 +403,24 @@ async function atualizarStatus(id, status) {
   } catch (error) {
     console.error(error);
     showToast(`Erro ao atualizar status: ${error.message}`, 'error');
+  }
+}
+
+async function excluirLancamento(id) {
+  if (!confirm('Deseja realmente excluir este lançamento?')) return;
+
+  try {
+    const resp = await apiPost({ action: 'deleteLancamento', id });
+
+    if (resp?.status !== 'ok') {
+      throw new Error(resp.message || 'Falha ao excluir lançamento.');
+    }
+
+    showToast('Lançamento excluído.', 'success');
+    await load();
+  } catch (error) {
+    console.error(error);
+    showToast(`Erro ao excluir: ${error.message}`, 'error');
   }
 }
 
