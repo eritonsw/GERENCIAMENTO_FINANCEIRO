@@ -110,7 +110,15 @@ body {
 }
 
 .chart-wrap {
-  min-height: 280px;
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  height: 260px;
+  margin: 0 auto;
+}
+
+#filtroMes {
+  text-transform: capitalize;
 }
 
 .styled-list {
