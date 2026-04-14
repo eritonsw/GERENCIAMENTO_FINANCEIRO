@@ -1,6 +1,9 @@
 let categoriasCache = [];
+let fixasCache = [];
+let extratoCache = [];
 let lancamentoEditandoId = null;
 let fixaEditandoId = null;
+let chartCategorias = null;
 
 async function apiGet(params = {}) {
   const url = new URL(API_URL);
@@ -31,8 +34,8 @@ async function apiPost(payload) {
 async function init() {
   try {
     await carregarCategorias();
-    await load();
     await carregarFixas();
+    await load();
   } catch (error) {
     console.error(error);
     showToast(`Erro ao iniciar: ${error.message}`, 'error');
@@ -48,14 +51,20 @@ async function load() {
       dataFim: document.getElementById('filtroFim')?.value || ''
     });
 
-    if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar dashboard.');
+    if (data?.status === 'erro') {
+      throw new Error(data.message || 'Erro ao carregar dashboard.');
+    }
 
-    document.getElementById('saldo').innerText = data?.saldo ?? 'R$ 0,00';
-    document.getElementById('receitas').innerText = data?.receitas ?? 'R$ 0,00';
-    document.getElementById('despesas').innerText = data?.despesas ?? 'R$ 0,00';
+    document.getElementById('saldoReal').innerText = data?.cards?.saldoReal ?? 'R$ 0,00';
+    document.getElementById('saldoProjetado').innerText = data?.cards?.saldoProjetado ?? 'R$ 0,00';
+    document.getElementById('receitasReais').innerText = data?.cards?.receitasReais ?? 'R$ 0,00';
+    document.getElementById('despesasProjetadas').innerText = data?.cards?.despesasProjetadas ?? 'R$ 0,00';
 
     renderLancamentos(Array.isArray(data?.lancamentos) ? data.lancamentos : []);
     renderVencimentos(Array.isArray(data?.vencimentos) ? data.vencimentos : []);
+    extratoCache = Array.isArray(data?.extrato) ? data.extrato : [];
+    renderExtrato(extratoCache);
+    renderChartCategorias(Array.isArray(data?.chartCategorias) ? data.chartCategorias : []);
   } catch (error) {
     console.error(error);
     showToast(`Erro ao carregar dados: ${error.message}`, 'error');
@@ -64,34 +73,49 @@ async function load() {
 
 async function carregarCategorias() {
   const data = await apiGet({ action: 'categorias' });
-  if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar categorias.');
+
+  if (data?.status === 'erro') {
+    throw new Error(data.message || 'Erro ao carregar categorias.');
+  }
 
   categoriasCache = Array.isArray(data?.categorias) ? data.categorias : [];
-  preencherSelectCategorias('categoria');
-  preencherSelectCategorias('fixaCategoria');
+  preencherSelectCategorias('categoria', true);
+  preencherSelectCategorias('fixaCategoria', false);
 }
 
-function preencherSelectCategorias(id) {
+async function carregarFixas() {
+  const data = await apiGet({ action: 'fixas' });
+
+  if (data?.status === 'erro') {
+    throw new Error(data.message || 'Erro ao carregar fixas.');
+  }
+
+  fixasCache = Array.isArray(data?.fixas) ? data.fixas : [];
+  renderFixas(fixasCache);
+}
+
+function preencherSelectCategorias(id, addAllOption = false) {
   const select = document.getElementById(id);
   if (!select) return;
 
   select.innerHTML = '';
+
+  if (addAllOption) {
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = 'Todas';
+    select.appendChild(option);
+  }
+
   categoriasCache.forEach(cat => {
     const option = document.createElement('option');
     option.value = cat;
     option.textContent = cat;
     select.appendChild(option);
   });
-}
 
-async function carregarFixas() {
-  try {
-    const data = await apiGet({ action: 'fixas' });
-    if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar fixas.');
-    renderFixas(Array.isArray(data?.fixas) ? data.fixas : []);
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao carregar fixas: ${error.message}`, 'error');
+  if (id === 'categoria' && !addAllOption && categoriasCache.length) {
+    select.value = categoriasCache[0];
   }
 }
 
@@ -104,16 +128,35 @@ function renderLancamentos(lancamentos) {
     return;
   }
 
-  lancamentos.forEach((lancamento) => {
+  lancamentos.forEach((item) => {
     const li = document.createElement('li');
 
-    const tipo = lancamento?.tipo ?? '';
-    const descricao = lancamento?.descricao ?? 'Sem descrição';
-    const valor = lancamento?.valor ?? '0,00';
-    const data = lancamento?.data ? formatDate(lancamento.data) : '';
-    const status = lancamento?.status ?? '';
+    const tipo = item?.tipo ?? '';
+    const descricao = item?.descricao ?? 'Sem descrição';
+    const valor = item?.valor ?? '0,00';
+    const data = item?.data ? formatDate(item.data) : '';
+    const status = item?.status ?? '';
     const tipoClasse = tipo === 'receita' ? 'receita' : 'despesa';
     const tipoTexto = tipo === 'receita' ? 'Receita' : 'Despesa';
+
+    let buttons = '';
+
+    if (item.virtualFixa) {
+      buttons += `<button class="mini-btn" onclick="editarFixaPorId('${escapeHtml(item.origem_fixa)}')">Editar fixa</button>`;
+      buttons += `<button class="mini-btn success" onclick="marcarFixaComoPaga('${escapeHtml(item.origem_fixa)}','${escapeHtml(item.competencia)}')">Marcar pago</button>`;
+    } else {
+      buttons += `<button class="mini-btn" onclick='editarLancamento(${JSON.stringify(item)})'>Editar</button>`;
+
+      if (tipo === 'despesa' && status !== 'pago') {
+        buttons += `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(item.id)}','pago')">Marcar pago</button>`;
+      }
+
+      if (tipo === 'receita' && status !== 'recebido') {
+        buttons += `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(item.id)}','recebido')">Marcar recebido</button>`;
+      }
+
+      buttons += `<button class="mini-btn danger" onclick="excluirLancamento('${escapeHtml(item.id)}')">Excluir</button>`;
+    }
 
     li.innerHTML = `
       <div class="item-row">
@@ -125,23 +168,62 @@ function renderLancamentos(lancamentos) {
           <span class="item-value ${tipoClasse}">
             ${tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(valor))}
           </span>
-
-          <div class="action-buttons">
-            <button class="mini-btn" onclick='editarLancamento(${JSON.stringify(lancamento)})'>Editar</button>
-            ${tipo === 'despesa' && status !== 'pago'
-              ? `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','pago')">Marcar pago</button>`
-              : ''}
-            ${tipo === 'receita' && status !== 'recebido'
-              ? `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','recebido')">Marcar recebido</button>`
-              : ''}
-            <button class="mini-btn danger" onclick="excluirLancamento('${escapeHtml(lancamento.id)}')">Excluir</button>
-          </div>
+          <div class="action-buttons">${buttons}</div>
         </div>
       </div>
     `;
 
     lista.appendChild(li);
   });
+}
+
+function renderExtrato(items) {
+  const lista = document.getElementById('extrato');
+  lista.innerHTML = '';
+
+  if (!items.length) {
+    lista.innerHTML = '<li class="empty-state">Nenhum item encontrado.</li>';
+    return;
+  }
+
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    const tipoClasse = item.tipo === 'receita' ? 'receita' : 'despesa';
+    const data = item.data ? formatDate(item.data) : '';
+    const venc = item.vencimento ? formatDate(item.vencimento) : '-';
+
+    li.innerHTML = `
+      <div class="item-row">
+        <div class="item-main">
+          <span class="item-title">${escapeHtml(item.descricao || '')}</span>
+          <span class="item-subtitle">
+            ${escapeHtml(item.categoria || '')} • ${escapeHtml(item.status || '')}
+            ${data ? ` • ${escapeHtml(data)}` : ''}
+            • venc.: ${escapeHtml(venc)}
+          </span>
+        </div>
+        <span class="item-value ${tipoClasse}">
+          ${item.tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(item.valor || '0,00'))}
+        </span>
+      </div>
+    `;
+    lista.appendChild(li);
+  });
+}
+
+function filtrarExtratoLocal() {
+  const texto = (document.getElementById('buscaTexto').value || '').trim().toLowerCase();
+  const categoria = document.getElementById('filtroCategoriaLocal').value || '';
+  const status = document.getElementById('filtroStatusLocal').value || '';
+
+  const filtrado = extratoCache.filter(item => {
+    const okTexto = !texto || String(item.descricao || '').toLowerCase().includes(texto);
+    const okCategoria = !categoria || String(item.categoria || '') === categoria;
+    const okStatus = !status || String(item.status || '') === status;
+    return okTexto && okCategoria && okStatus;
+  });
+
+  renderExtrato(filtrado);
 }
 
 function renderVencimentos(vencimentos) {
@@ -155,6 +237,7 @@ function renderVencimentos(vencimentos) {
 
   vencimentos.forEach((item) => {
     const li = document.createElement('li');
+
     const descricao = item?.descricao ?? 'Conta';
     const vencimento = item?.vencimento ?? 'Sem data';
     const valor = item?.valor ? `R$ ${item.valor}` : 'Valor não informado';
@@ -225,6 +308,38 @@ function renderFixas(fixas) {
   });
 }
 
+function renderChartCategorias(data) {
+  const ctx = document.getElementById('chartCategorias');
+  if (!ctx) return;
+
+  const labels = data.map(item => item.categoria);
+  const values = data.map(item => item.valor);
+
+  if (chartCategorias) {
+    chartCategorias.destroy();
+  }
+
+  chartCategorias = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data: values
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          labels: {
+            color: '#e5e7eb'
+          }
+        }
+      }
+    }
+  });
+}
+
 function aplicarFiltros() {
   load();
 }
@@ -287,20 +402,20 @@ function limparFormularioFixa() {
   fixaEditandoId = null;
 }
 
-function editarLancamento(lancamento) {
-  lancamentoEditandoId = lancamento.id;
+function editarLancamento(item) {
+  lancamentoEditandoId = item.id;
   document.getElementById('modal').classList.remove('hidden');
   document.getElementById('modalTitle').textContent = 'Editar lançamento';
   document.getElementById('saveButton').textContent = 'Atualizar';
 
-  document.getElementById('desc').value = lancamento.descricao || '';
-  document.getElementById('valor').value = (lancamento.valor || '0,00').replace(',', '.');
-  document.getElementById('tipo').value = lancamento.tipo || 'despesa';
-  document.getElementById('dataLancamento').value = lancamento.data || '';
-  document.getElementById('vencimento').value = lancamento.vencimento || '';
-  document.getElementById('categoria').value = lancamento.categoria || 'Outros';
-  document.getElementById('status').value = lancamento.status || 'pendente';
-  document.getElementById('observacoes').value = lancamento.observacoes || '';
+  document.getElementById('desc').value = item.descricao || '';
+  document.getElementById('valor').value = (item.valor || '0,00').replace(',', '.');
+  document.getElementById('tipo').value = item.tipo || 'despesa';
+  document.getElementById('dataLancamento').value = item.data || '';
+  document.getElementById('vencimento').value = item.vencimento || '';
+  document.getElementById('categoria').value = item.categoria || 'Outros';
+  document.getElementById('status').value = item.status || 'pendente';
+  document.getElementById('observacoes').value = item.observacoes || '';
 }
 
 function editarFixa(fixa) {
@@ -315,6 +430,24 @@ function editarFixa(fixa) {
   document.getElementById('fixaDia').value = fixa.dia_vencimento || '';
   document.getElementById('fixaAtivo').value = fixa.ativo || 'sim';
   document.getElementById('fixaObs').value = fixa.observacoes || '';
+}
+
+function editarFixaPorId(idFixa) {
+  const fixa = fixasCache.find(f => String(f.id_fixa) === String(idFixa));
+  if (!fixa) {
+    showToast('Despesa fixa não encontrada.', 'error');
+    return;
+  }
+
+  editarFixa({
+    id: fixa.id_fixa,
+    descricao: fixa.descricao,
+    categoria: fixa.categoria,
+    valor_padrao: fixa.valor_padrao,
+    dia_vencimento: fixa.dia_vencimento,
+    ativo: fixa.ativo,
+    observacoes: fixa.observacoes
+  });
 }
 
 async function salvar() {
@@ -354,11 +487,11 @@ async function salvar() {
 
   try {
     const isEdit = Boolean(lancamentoEditandoId);
-    const dataResp = isEdit
+    const resp = isEdit
       ? await apiPost({ action: 'updateLancamento', id: lancamentoEditandoId, ...payload })
       : await apiPost({ action: 'addLancamento', ...payload });
 
-    if (dataResp?.status !== 'ok') throw new Error(dataResp.message || 'Falha ao salvar.');
+    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao salvar.');
 
     limparFormulario();
     closeModal();
@@ -430,6 +563,25 @@ async function atualizarStatus(id, status) {
   }
 }
 
+async function marcarFixaComoPaga(idFixa, competencia) {
+  try {
+    const resp = await apiPost({
+      action: 'materializeFixa',
+      id_fixa: idFixa,
+      competencia,
+      status: 'pago'
+    });
+
+    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao lançar despesa fixa.');
+
+    showToast('Despesa fixa marcada como paga.', 'success');
+    await load();
+  } catch (error) {
+    console.error(error);
+    showToast(`Erro ao marcar fixa: ${error.message}`, 'error');
+  }
+}
+
 async function excluirLancamento(id) {
   if (!confirm('Deseja realmente excluir este lançamento?')) return;
 
@@ -467,7 +619,9 @@ function showToast(message, type = 'success') {
   toast.className = `toast ${type}`;
   toast.classList.remove('hidden');
 
-  setTimeout(() => toast.classList.add('hidden'), 3000);
+  setTimeout(() => {
+    toast.classList.add('hidden');
+  }, 3000);
 }
 
 function formatDate(value) {
@@ -492,8 +646,13 @@ function escapeHtml(text) {
 window.addEventListener('click', function (event) {
   const modal = document.getElementById('modal');
   const fixaModal = document.getElementById('fixaModal');
+
   if (event.target === modal) closeModal();
   if (event.target === fixaModal) closeFixaModal();
 });
+
+document.getElementById('buscaTexto')?.addEventListener('input', filtrarExtratoLocal);
+document.getElementById('filtroCategoriaLocal')?.addEventListener('change', filtrarExtratoLocal);
+document.getElementById('filtroStatusLocal')?.addEventListener('change', filtrarExtratoLocal);
 
 init();
