@@ -1,5 +1,6 @@
 let categoriasCache = [];
 let lancamentoEditandoId = null;
+let fixaEditandoId = null;
 
 async function apiGet(params = {}) {
   const url = new URL(API_URL);
@@ -47,9 +48,7 @@ async function load() {
       dataFim: document.getElementById('filtroFim')?.value || ''
     });
 
-    if (data?.status === 'erro') {
-      throw new Error(data.message || 'Erro ao carregar dashboard.');
-    }
+    if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar dashboard.');
 
     document.getElementById('saldo').innerText = data?.saldo ?? 'R$ 0,00';
     document.getElementById('receitas').innerText = data?.receitas ?? 'R$ 0,00';
@@ -58,17 +57,14 @@ async function load() {
     renderLancamentos(Array.isArray(data?.lancamentos) ? data.lancamentos : []);
     renderVencimentos(Array.isArray(data?.vencimentos) ? data.vencimentos : []);
   } catch (error) {
-    console.error('Erro ao carregar dados:', error);
+    console.error(error);
     showToast(`Erro ao carregar dados: ${error.message}`, 'error');
   }
 }
 
 async function carregarCategorias() {
   const data = await apiGet({ action: 'categorias' });
-
-  if (data?.status === 'erro') {
-    throw new Error(data.message || 'Erro ao carregar categorias.');
-  }
+  if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar categorias.');
 
   categoriasCache = Array.isArray(data?.categorias) ? data.categorias : [];
   preencherSelectCategorias('categoria');
@@ -91,11 +87,7 @@ function preencherSelectCategorias(id) {
 async function carregarFixas() {
   try {
     const data = await apiGet({ action: 'fixas' });
-
-    if (data?.status === 'erro') {
-      throw new Error(data.message || 'Erro ao carregar fixas.');
-    }
-
+    if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar fixas.');
     renderFixas(Array.isArray(data?.fixas) ? data.fixas : []);
   } catch (error) {
     console.error(error);
@@ -136,15 +128,12 @@ function renderLancamentos(lancamentos) {
 
           <div class="action-buttons">
             <button class="mini-btn" onclick='editarLancamento(${JSON.stringify(lancamento)})'>Editar</button>
-
             ${tipo === 'despesa' && status !== 'pago'
               ? `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','pago')">Marcar pago</button>`
               : ''}
-
             ${tipo === 'receita' && status !== 'recebido'
               ? `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(lancamento.id)}','recebido')">Marcar recebido</button>`
               : ''}
-
             <button class="mini-btn danger" onclick="excluirLancamento('${escapeHtml(lancamento.id)}')">Excluir</button>
           </div>
         </div>
@@ -166,7 +155,6 @@ function renderVencimentos(vencimentos) {
 
   vencimentos.forEach((item) => {
     const li = document.createElement('li');
-
     const descricao = item?.descricao ?? 'Conta';
     const vencimento = item?.vencimento ?? 'Sem data';
     const valor = item?.valor ? `R$ ${item.valor}` : 'Valor não informado';
@@ -207,14 +195,30 @@ function renderFixas(fixas) {
     const valorNum = Number(fixa.valor_padrao || 0);
     const valorTexto = Number.isNaN(valorNum) ? '0,00' : valorNum.toFixed(2).replace('.', ',');
 
+    const obj = {
+      id: fixa.id_fixa || '',
+      descricao: fixa.descricao || '',
+      categoria: fixa.categoria || 'Outros',
+      valor_padrao: fixa.valor_padrao || 0,
+      dia_vencimento: fixa.dia_vencimento || '',
+      ativo: fixa.ativo || 'sim',
+      observacoes: fixa.observacoes || ''
+    };
+
     const li = document.createElement('li');
     li.innerHTML = `
       <div class="item-row">
         <div class="item-main">
-          <span class="item-title">${escapeHtml(fixa.descricao || '')}</span>
-          <span class="item-subtitle">${escapeHtml(fixa.categoria || '')} • dia ${escapeHtml(String(fixa.dia_vencimento || ''))}</span>
+          <span class="item-title">${escapeHtml(obj.descricao)}</span>
+          <span class="item-subtitle">${escapeHtml(obj.categoria)} • dia ${escapeHtml(String(obj.dia_vencimento))} • ${escapeHtml(obj.ativo)}</span>
         </div>
-        <span class="item-value despesa">R$ ${valorTexto}</span>
+        <div class="item-actions">
+          <span class="item-value despesa">R$ ${valorTexto}</span>
+          <div class="action-buttons">
+            <button class="mini-btn" onclick='editarFixa(${JSON.stringify(obj)})'>Editar</button>
+            <button class="mini-btn danger" onclick="excluirFixa('${escapeHtml(obj.id)}')">Excluir</button>
+          </div>
+        </div>
       </div>
     `;
     lista.appendChild(li);
@@ -248,6 +252,9 @@ function closeModal() {
 
 function openFixaModal() {
   document.getElementById('fixaModal').classList.remove('hidden');
+  document.getElementById('fixaModalTitle').textContent = 'Nova despesa fixa';
+  document.getElementById('saveFixaButton').textContent = 'Salvar';
+  fixaEditandoId = null;
 }
 
 function closeFixaModal() {
@@ -275,7 +282,9 @@ function limparFormularioFixa() {
   }
   document.getElementById('fixaValor').value = '';
   document.getElementById('fixaDia').value = '';
+  document.getElementById('fixaAtivo').value = 'sim';
   document.getElementById('fixaObs').value = '';
+  fixaEditandoId = null;
 }
 
 function editarLancamento(lancamento) {
@@ -292,6 +301,20 @@ function editarLancamento(lancamento) {
   document.getElementById('categoria').value = lancamento.categoria || 'Outros';
   document.getElementById('status').value = lancamento.status || 'pendente';
   document.getElementById('observacoes').value = lancamento.observacoes || '';
+}
+
+function editarFixa(fixa) {
+  fixaEditandoId = fixa.id;
+  document.getElementById('fixaModal').classList.remove('hidden');
+  document.getElementById('fixaModalTitle').textContent = 'Editar despesa fixa';
+  document.getElementById('saveFixaButton').textContent = 'Atualizar';
+
+  document.getElementById('fixaDesc').value = fixa.descricao || '';
+  document.getElementById('fixaCategoria').value = fixa.categoria || 'Outros';
+  document.getElementById('fixaValor').value = Number(fixa.valor_padrao || 0);
+  document.getElementById('fixaDia').value = fixa.dia_vencimento || '';
+  document.getElementById('fixaAtivo').value = fixa.ativo || 'sim';
+  document.getElementById('fixaObs').value = fixa.observacoes || '';
 }
 
 async function salvar() {
@@ -318,29 +341,28 @@ async function salvar() {
   if (tipo === 'receita' && status === 'pago') status = 'recebido';
   if (tipo === 'despesa' && status === 'recebido') status = 'pago';
 
-  try {
-    const payload = {
-      descricao,
-      valor: valorNumero,
-      tipo,
-      data,
-      vencimento,
-      categoria,
-      status,
-      observacoes
-    };
+  const payload = {
+    descricao,
+    valor: valorNumero,
+    tipo,
+    data,
+    vencimento,
+    categoria,
+    status,
+    observacoes
+  };
 
-    const dataResp = lancamentoEditandoId
+  try {
+    const isEdit = Boolean(lancamentoEditandoId);
+    const dataResp = isEdit
       ? await apiPost({ action: 'updateLancamento', id: lancamentoEditandoId, ...payload })
       : await apiPost({ action: 'addLancamento', ...payload });
 
-    if (dataResp?.status !== 'ok') {
-      throw new Error(dataResp.message || 'Falha ao salvar.');
-    }
+    if (dataResp?.status !== 'ok') throw new Error(dataResp.message || 'Falha ao salvar.');
 
     limparFormulario();
     closeModal();
-    showToast(lancamentoEditandoId ? 'Lançamento atualizado.' : 'Lançamento salvo com sucesso.', 'success');
+    showToast(isEdit ? 'Lançamento atualizado.' : 'Lançamento salvo com sucesso.', 'success');
     await load();
   } catch (error) {
     console.error(error);
@@ -353,6 +375,7 @@ async function salvarFixa() {
   const categoria = document.getElementById('fixaCategoria').value || 'Outros';
   const valor = document.getElementById('fixaValor').value.trim();
   const dia = document.getElementById('fixaDia').value.trim();
+  const ativo = document.getElementById('fixaAtivo').value;
   const observacoes = document.getElementById('fixaObs').value.trim();
 
   if (!descricao || !dia) {
@@ -366,24 +389,28 @@ async function salvarFixa() {
     return;
   }
 
-  try {
-    const resp = await apiPost({
-      action: 'addFixa',
-      descricao,
-      categoria,
-      valor_padrao: Number(valor || 0),
-      dia_vencimento: diaNumero,
-      observacoes
-    });
+  const payload = {
+    descricao,
+    categoria,
+    valor_padrao: Number(valor || 0),
+    dia_vencimento: diaNumero,
+    ativo,
+    observacoes
+  };
 
-    if (resp?.status !== 'ok') {
-      throw new Error(resp.message || 'Falha ao salvar despesa fixa.');
-    }
+  try {
+    const isEdit = Boolean(fixaEditandoId);
+    const resp = isEdit
+      ? await apiPost({ action: 'updateFixa', id: fixaEditandoId, ...payload })
+      : await apiPost({ action: 'addFixa', ...payload });
+
+    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao salvar despesa fixa.');
 
     limparFormularioFixa();
     closeFixaModal();
-    showToast('Despesa fixa cadastrada.', 'success');
+    showToast(isEdit ? 'Despesa fixa atualizada.' : 'Despesa fixa cadastrada.', 'success');
     await carregarFixas();
+    await load();
   } catch (error) {
     console.error(error);
     showToast(`Erro ao salvar fixa: ${error.message}`, 'error');
@@ -393,10 +420,7 @@ async function salvarFixa() {
 async function atualizarStatus(id, status) {
   try {
     const resp = await apiPost({ action: 'updateStatus', id, status });
-
-    if (resp?.status !== 'ok') {
-      throw new Error(resp.message || 'Falha ao atualizar status.');
-    }
+    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao atualizar status.');
 
     showToast('Status atualizado.', 'success');
     await load();
@@ -411,10 +435,7 @@ async function excluirLancamento(id) {
 
   try {
     const resp = await apiPost({ action: 'deleteLancamento', id });
-
-    if (resp?.status !== 'ok') {
-      throw new Error(resp.message || 'Falha ao excluir lançamento.');
-    }
+    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao excluir lançamento.');
 
     showToast('Lançamento excluído.', 'success');
     await load();
@@ -424,15 +445,29 @@ async function excluirLancamento(id) {
   }
 }
 
+async function excluirFixa(id) {
+  if (!confirm('Deseja realmente excluir esta despesa fixa?')) return;
+
+  try {
+    const resp = await apiPost({ action: 'deleteFixa', id });
+    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao excluir despesa fixa.');
+
+    showToast('Despesa fixa excluída.', 'success');
+    await carregarFixas();
+    await load();
+  } catch (error) {
+    console.error(error);
+    showToast(`Erro ao excluir fixa: ${error.message}`, 'error');
+  }
+}
+
 function showToast(message, type = 'success') {
   const toast = document.getElementById('toast');
   toast.textContent = message;
   toast.className = `toast ${type}`;
   toast.classList.remove('hidden');
 
-  setTimeout(() => {
-    toast.classList.add('hidden');
-  }, 3000);
+  setTimeout(() => toast.classList.add('hidden'), 3000);
 }
 
 function formatDate(value) {
@@ -457,7 +492,6 @@ function escapeHtml(text) {
 window.addEventListener('click', function (event) {
   const modal = document.getElementById('modal');
   const fixaModal = document.getElementById('fixaModal');
-
   if (event.target === modal) closeModal();
   if (event.target === fixaModal) closeFixaModal();
 });
