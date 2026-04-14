@@ -33,8 +33,10 @@ async function apiPost(payload) {
 
 async function init() {
   try {
+    preencherFiltroMes();
     await carregarCategorias();
     await carregarFixas();
+    preencherFiltroCategoriaLocal();
     await load();
   } catch (error) {
     console.error(error);
@@ -92,6 +94,57 @@ async function carregarFixas() {
 
   fixasCache = Array.isArray(data?.fixas) ? data.fixas : [];
   renderFixas(fixasCache);
+}
+function preencherFiltroCategoriaLocal() {
+  const select = document.getElementById('filtroCategoriaLocal');
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  const optTodos = document.createElement('option');
+  optTodos.value = '';
+  optTodos.textContent = 'Todas';
+  select.appendChild(optTodos);
+
+  categoriasCache.forEach(cat => {
+    const option = document.createElement('option');
+    option.value = cat;
+    option.textContent = cat;
+    select.appendChild(option);
+  });
+}
+function preencherFiltroMes() {
+  const select = document.getElementById('filtroMes');
+  if (!select) return;
+
+  select.innerHTML = '';
+
+  const optTodos = document.createElement('option');
+  optTodos.value = '';
+  optTodos.textContent = 'Todos';
+  select.appendChild(optTodos);
+
+  const hoje = new Date();
+
+  for (let i = 0; i < 12; i++) {
+    const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const valor = `${ano}-${mes}`;
+
+    const nomeMes = data.toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric'
+    });
+
+    const option = document.createElement('option');
+    option.value = valor;
+    option.textContent = nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+    select.appendChild(option);
+  }
+
+  const atual = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}`;
+  select.value = atual;
 }
 
 function preencherSelectCategorias(id, addAllOption = false) {
@@ -324,15 +377,22 @@ function renderChartCategorias(data) {
     data: {
       labels,
       datasets: [{
-        data: values
+        data: values,
+        borderWidth: 2,
+        hoverOffset: 6
       }]
     },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
+      cutout: '55%',
       plugins: {
         legend: {
+          position: 'top',
           labels: {
-            color: '#e5e7eb'
+            color: '#e5e7eb',
+            boxWidth: 18,
+            padding: 12
           }
         }
       }
