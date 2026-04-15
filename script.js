@@ -1,863 +1,406 @@
-let categoriasCache = [];
-let fixasCache = [];
-let extratoCache = [];
-let lancamentoEditandoId = null;
-let fixaEditandoId = null;
-let chartCategorias = null;
+let state = {
+  categorias: [],
+  cartoes: [],
+  lancamentos: [],
+  fixas: [],
+  faturas: [],
+  dashboard: {},
+};
 
-let formasPagamentoCache = [];
-let contasPagamentoCache = [];
+let chartCategorias;
 
-let limiteLancamentos = 5;
-let limiteVencimentos = 5;
-let limiteFixas = 5;
-let limiteExtrato = 8;
+const $$ = sel => document.querySelector(sel);
+const el = {
+  filterMonth: $$('#filterMonth'),
+  filterYear: $$('#filterYear'),
+  filterCategory: $$('#filterCategory'),
+  filterStatus: $$('#filterStatus'),
+  filterForma: $$('#filterForma'),
+  filterConta: $$('#filterConta'),
+  cardSaldoReal: $$('#cardSaldoReal'),
+  cardSaldoProjetado: $$('#cardSaldoProjetado'),
+  cardReceitas: $$('#cardReceitas'),
+  cardDespesas: $$('#cardDespesas'),
+  extratoList: $$('#extratoList'),
+  fixasList: $$('#fixasList'),
+  faturasList: $$('#faturasList'),
+  proximaFatura: $$('#proximaFatura'),
+  btnRefresh: $$('#btnRefresh'),
+  btnNewLancamento: $$('#btnNewLancamento'),
+  btnNewFixa: $$('#btnNewFixa'),
+  btnNewCartao: $$('#btnNewCartao'),
+  modalLancamento: $$('#modalLancamento'),
+  modalFixa: $$('#modalFixa'),
+  modalCartao: $$('#modalCartao'),
+  formLancamento: $$('#formLancamento'),
+  formFixa: $$('#formFixa'),
+  formCartao: $$('#formCartao'),
+  modalCategoria: $$('#modalCategoria'),
+  modalFixaCategoria: $$('#modalFixaCategoria'),
+  modalConta: $$('#modalConta'),
+};
 
-const LIMITE_INICIAL_LANC = 5;
-const LIMITE_INICIAL_VENC = 5;
-const LIMITE_INICIAL_FIX = 5;
-const LIMITE_INICIAL_EXT = 8;
+document.addEventListener('DOMContentLoaded', async () => {
+  initFilters();
+  bindEvents();
+  await loadBootstrap();
+  registerServiceWorker();
+});
 
-async function apiGet(params = {}) {
-  const url = new URL(API_URL);
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
-      url.searchParams.set(key, value);
-    }
-  });
-
-  const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
-  return await res.json();
-}
-
-async function apiPost(payload) {
-  const formData = new URLSearchParams();
-  formData.append('payload', JSON.stringify(payload));
-
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    body: formData
-  });
-
-  if (!res.ok) throw new Error(`Erro HTTP ${res.status}`);
-  return await res.json();
-}
-
-async function init() {
-  try {
-    preencherFiltroMesAno();
-    await carregarCategorias();
-    await carregarFormasContas();
-    await carregarFixas();
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao iniciar: ${error.message}`, 'error');
-  }
-}
-
-function preencherFiltroMesAno() {
-  const selectMes = document.getElementById('filtroMes');
-  const selectAno = document.getElementById('filtroAno');
-
-  if (!selectMes || !selectAno) return;
-
-  selectMes.innerHTML = '<option value="">Todos</option>';
-  selectAno.innerHTML = '<option value="">Todos</option>';
-
-  const meses = [
-    { v: '01', n: 'Janeiro' },
-    { v: '02', n: 'Fevereiro' },
-    { v: '03', n: 'Março' },
-    { v: '04', n: 'Abril' },
-    { v: '05', n: 'Maio' },
-    { v: '06', n: 'Junho' },
-    { v: '07', n: 'Julho' },
-    { v: '08', n: 'Agosto' },
-    { v: '09', n: 'Setembro' },
-    { v: '10', n: 'Outubro' },
-    { v: '11', n: 'Novembro' },
-    { v: '12', n: 'Dezembro' }
-  ];
-
-  meses.forEach(m => {
+function initFilters() {
+  const now = new Date();
+  for (let m = 1; m <= 12; m++) {
     const opt = document.createElement('option');
-    opt.value = m.v;
-    opt.textContent = m.n;
-    selectMes.appendChild(opt);
-  });
-
-  const anoAtual = new Date().getFullYear();
-  for (let ano = anoAtual + 1; ano >= anoAtual - 5; ano--) {
+    opt.value = m;
+    opt.textContent = String(m).padStart(2, '0');
+    if (m === now.getMonth() + 1) opt.selected = true;
+    el.filterMonth.appendChild(opt);
+  }
+  for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 2; y++) {
     const opt = document.createElement('option');
-    opt.value = String(ano);
-    opt.textContent = String(ano);
-    selectAno.appendChild(opt);
+    opt.value = y;
+    opt.textContent = y;
+    if (y === now.getFullYear()) opt.selected = true;
+    el.filterYear.appendChild(opt);
   }
-
-  selectMes.value = String(new Date().getMonth() + 1).padStart(2, '0');
-  selectAno.value = String(new Date().getFullYear());
 }
 
-async function carregarCategorias() {
-  const data = await apiGet({ action: 'categorias' });
-  if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar categorias.');
+function bindEvents() {
+  [el.filterMonth, el.filterYear].forEach(item => item.addEventListener('change', loadBootstrap));
+  [el.filterCategory, el.filterStatus, el.filterForma, el.filterConta].forEach(item => item.addEventListener('change', renderAll));
+  el.btnRefresh.addEventListener('click', loadBootstrap);
+  el.btnNewLancamento.addEventListener('click', () => openDialog(el.modalLancamento));
+  el.btnNewFixa.addEventListener('click', () => openDialog(el.modalFixa));
+  el.btnNewCartao.addEventListener('click', () => openDialog(el.modalCartao));
 
-  categoriasCache = Array.isArray(data?.categorias) ? data.categorias : [];
-
-  preencherSelect('categoria', categoriasCache, false, null);
-  preencherSelect('fixaCategoria', categoriasCache, false, null);
-  preencherSelect('filtroCategoriaLocal', categoriasCache, true, 'Todas');
+  el.formLancamento.addEventListener('submit', onSaveLancamento);
+  el.formFixa.addEventListener('submit', onSaveFixa);
+  el.formCartao.addEventListener('submit', onSaveCartao);
 }
 
-async function carregarFormasContas() {
-  const formasResp = await apiGet({ action: 'formasPagamento' });
-  const contasResp = await apiGet({ action: 'contasPagamento' });
-
-  formasPagamentoCache = Array.isArray(formasResp?.formas) ? formasResp.formas : [];
-  contasPagamentoCache = Array.isArray(contasResp?.contas) ? contasResp.contas : [];
-
-  preencherSelect('formaPagamento', formasPagamentoCache, false, null);
-  preencherSelect('contaPagamento', contasPagamentoCache, false, null);
-  preencherSelect('filtroFormaLocal', formasPagamentoCache, true, 'Todas');
-  preencherSelect('filtroContaLocal', contasPagamentoCache, true, 'Todas');
-}
-
-function preencherSelect(id, values, includeEmpty = false, emptyLabel = 'Todos') {
-  const select = document.getElementById(id);
-  if (!select) return;
-
-  select.innerHTML = '';
-
-  if (includeEmpty) {
-    const option = document.createElement('option');
-    option.value = '';
-    option.textContent = emptyLabel;
-    select.appendChild(option);
-  }
-
-  values.forEach(v => {
-    const option = document.createElement('option');
-    option.value = v;
-    option.textContent = v;
-    select.appendChild(option);
-  });
-}
-
-async function carregarFixas() {
-  const data = await apiGet({ action: 'fixas' });
-  if (data?.status === 'erro') throw new Error(data.message || 'Erro ao carregar fixas.');
-
-  fixasCache = Array.isArray(data?.fixas) ? data.fixas : [];
-  renderFixas(fixasCache);
-}
-
-async function load() {
+async function loadBootstrap() {
   try {
-    const data = await apiGet({
-      action: 'dashboard',
-      mes: document.getElementById('filtroMes')?.value || '',
-      ano: document.getElementById('filtroAno')?.value || '',
-      dataInicio: document.getElementById('filtroInicio')?.value || '',
-      dataFim: document.getElementById('filtroFim')?.value || ''
+    const params = new URLSearchParams({
+      action: 'bootstrap',
+      month: el.filterMonth.value,
+      year: el.filterYear.value,
     });
-
-    if (data?.status === 'erro') {
-      throw new Error(data.message || 'Erro ao carregar dashboard.');
-    }
-
-    document.getElementById('saldoReal').innerText = data?.cards?.saldoReal ?? 'R$ 0,00';
-    document.getElementById('saldoProjetado').innerText = data?.cards?.saldoProjetado ?? 'R$ 0,00';
-    document.getElementById('receitasReais').innerText = data?.cards?.receitasReais ?? 'R$ 0,00';
-    document.getElementById('despesasProjetadas').innerText = data?.cards?.despesasProjetadas ?? 'R$ 0,00';
-
-    extratoCache = Array.isArray(data?.extrato) ? data.extrato : [];
-
-    renderLancamentos(Array.isArray(data?.lancamentos) ? data.lancamentos : []);
-    renderVencimentos(Array.isArray(data?.vencimentos) ? data.vencimentos : []);
-    renderExtrato(extratoCache);
-    renderChartCategorias(Array.isArray(data?.chartCategorias) ? data.chartCategorias : []);
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao carregar dados: ${error.message}`, 'error');
+    const res = await fetch(`${API_URL}?${params.toString()}`);
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'Falha ao carregar');
+    state = json;
+    populateFilters();
+    populateModals();
+    renderAll();
+  } catch (err) {
+    alert('Erro ao carregar dados: ' + err.message);
   }
 }
 
-function renderLancamentos(items) {
-  const lista = document.getElementById('lancamentos');
-  const footer = document.getElementById('lancamentosFooter');
-  lista.innerHTML = '';
+function populateFilters() {
+  fillSelect(el.filterCategory, [''].concat(state.categorias), 'Todas');
+  fillSelect(el.modalCategoria, state.categorias, 'Selecione');
+  fillSelect(el.modalFixaCategoria, state.categorias, 'Selecione');
 
-  if (!items.length) {
-    lista.innerHTML = '<li class="empty-state">Nenhum lançamento encontrado.</li>';
-    if (footer) footer.innerHTML = '';
-    return;
-  }
+  const formas = unique(state.lancamentos.map(l => l.forma_pagamento).filter(Boolean).concat(['Pix','Débito','Crédito','Boleto','Dinheiro','Transferência']));
+  fillSelect(el.filterForma, [''].concat(formas), 'Todas');
 
-  const visiveis = items.slice(0, limiteLancamentos);
-
-  visiveis.forEach((item) => {
-    const li = document.createElement('li');
-
-    const tipo = item?.tipo ?? '';
-    const descricao = item?.descricao ?? 'Sem descrição';
-    const valor = item?.valor ?? '0,00';
-    const data = item?.data ? formatDate(item.data) : '';
-    const status = item?.status ?? '';
-    const tipoClasse = tipo === 'receita' ? 'receita' : 'despesa';
-    const tipoTexto = tipo === 'receita' ? 'Receita' : 'Despesa';
-
-    let buttons = '';
-
-    if (item.virtualFixa) {
-      buttons += `<button class="mini-btn" onclick="editarFixaPorId('${escapeHtml(item.origem_fixa)}')">Editar fixa</button>`;
-      buttons += `<button class="mini-btn success" onclick="abrirPagamentoFixa('${escapeHtml(item.origem_fixa)}','${escapeHtml(item.competencia)}')">Marcar pago</button>`;
-    } else {
-      buttons += `<button class="mini-btn" onclick='editarLancamento(${JSON.stringify(item)})'>Editar</button>`;
-
-      if (tipo === 'despesa' && status !== 'pago') {
-        buttons += `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(item.id)}','pago')">Marcar pago</button>`;
-      }
-
-      if (tipo === 'receita' && status !== 'recebido') {
-        buttons += `<button class="mini-btn success" onclick="atualizarStatus('${escapeHtml(item.id)}','recebido')">Marcar recebido</button>`;
-      }
-
-      buttons += `<button class="mini-btn danger" onclick="excluirLancamento('${escapeHtml(item.id)}')">Excluir</button>`;
-    }
-
-    li.innerHTML = `
-      <div class="item-row">
-        <div class="item-main">
-          <span class="item-title">${escapeHtml(descricao)}</span>
-          <span class="item-subtitle">
-            ${tipoTexto}${data ? ` • ${escapeHtml(data)}` : ''} • ${escapeHtml(status)}
-            ${item.forma_pagamento ? ` • ${escapeHtml(item.forma_pagamento)}` : ''}
-            ${item.conta_pagamento ? ` • ${escapeHtml(item.conta_pagamento)}` : ''}
-          </span>
-        </div>
-        <div class="item-actions">
-          <span class="item-value ${tipoClasse}">
-            ${tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(valor))}
-          </span>
-          <div class="action-buttons">${buttons}</div>
-        </div>
-      </div>
-    `;
-
-    lista.appendChild(li);
-  });
-
-  if (footer) {
-    footer.innerHTML = `
-      <button class="btn btn-secondary btn-small" type="button" onclick="toggleLancamentos(${items.length})">
-        ${limiteLancamentos >= items.length ? '− Ver menos' : '+ Ver mais'}
-      </button>
-    `;
-  }
+  const contas = unique(
+    state.lancamentos.map(l => l.conta_pagamento).filter(Boolean)
+      .concat(state.cartoes.map(c => c.nome_cartao))
+  );
+  fillSelect(el.filterConta, [''].concat(contas), 'Todos');
+  fillSelect(el.modalConta, state.cartoes.map(c => c.nome_cartao), 'Selecione');
 }
 
-function renderVencimentos(items) {
-  const lista = document.getElementById('vencimentos');
-  const footer = document.getElementById('vencimentosFooter');
-  lista.innerHTML = '';
-
-  if (!items.length) {
-    lista.innerHTML = '<li class="empty-state">Nenhum vencimento próximo.</li>';
-    if (footer) footer.innerHTML = '';
-    return;
-  }
-
-  const visiveis = items.slice(0, limiteVencimentos);
-
-  visiveis.forEach((item) => {
-    const li = document.createElement('li');
-    const descricao = item?.descricao ?? 'Conta';
-    const vencimento = item?.vencimento ?? 'Sem data';
-    const valor = item?.valor ? `R$ ${item.valor}` : 'Valor não informado';
-    const nivel = item?.nivel ?? 'normal';
-
-    li.classList.add(
-      nivel === 'danger' ? 'vencimento-danger' :
-      nivel === 'warning' ? 'vencimento-warning' :
-      'vencimento-normal'
-    );
-
-    li.innerHTML = `
-      <div class="item-row">
-        <div class="item-main">
-          <span class="item-title">${escapeHtml(descricao)}</span>
-          <span class="item-subtitle">Vence em ${escapeHtml(vencimento)}</span>
-        </div>
-        <span class="item-value despesa">${escapeHtml(valor)}</span>
-      </div>
-    `;
-
-    lista.appendChild(li);
-  });
-
-  if (footer) {
-    footer.innerHTML = `
-      <button class="btn btn-secondary btn-small" type="button" onclick="toggleVencimentos(${items.length})">
-        ${limiteVencimentos >= items.length ? '− Ver menos' : '+ Ver mais'}
-      </button>
-    `;
-  }
+function populateModals() {
+  el.formLancamento.reset();
+  el.formFixa.reset();
+  el.formCartao.reset();
+  const today = new Date().toISOString().slice(0, 10);
+  el.formLancamento.elements.data.value = today;
 }
 
-function renderExtrato(items) {
-  const lista = document.getElementById('extrato');
-  const footer = document.getElementById('extratoFooter');
-  lista.innerHTML = '';
-
-  if (!items.length) {
-    lista.innerHTML = '<li class="empty-state">Nenhum item encontrado.</li>';
-    if (footer) footer.innerHTML = '';
-    return;
-  }
-
-  const visiveis = items.slice(0, limiteExtrato);
-
-  visiveis.forEach((item) => {
-    const li = document.createElement('li');
-    const tipoClasse = item.tipo === 'receita' ? 'receita' : 'despesa';
-    const data = item.data ? formatDate(item.data) : '';
-    const venc = item.vencimento ? formatDate(item.vencimento) : '-';
-
-    li.innerHTML = `
-      <div class="item-row">
-        <div class="item-main">
-          <span class="item-title">${escapeHtml(item.descricao || '')}</span>
-          <span class="item-subtitle">
-            ${escapeHtml(item.categoria || '')} • ${escapeHtml(item.status || '')}
-            ${data ? ` • ${escapeHtml(data)}` : ''}
-            • venc.: ${escapeHtml(venc)}
-            ${item.forma_pagamento ? ` • ${escapeHtml(item.forma_pagamento)}` : ''}
-            ${item.conta_pagamento ? ` • ${escapeHtml(item.conta_pagamento)}` : ''}
-          </span>
-        </div>
-        <span class="item-value ${tipoClasse}">
-          ${item.tipo === 'receita' ? '+' : '-'} R$ ${escapeHtml(String(item.valor || '0,00'))}
-        </span>
-      </div>
-    `;
-    lista.appendChild(li);
-  });
-
-  if (footer) {
-    footer.innerHTML = `
-      <button class="btn btn-secondary btn-small" type="button" onclick="toggleExtrato(${items.length})">
-        ${limiteExtrato >= items.length ? '− Ver menos' : '+ Ver mais'}
-      </button>
-    `;
-  }
+function renderAll() {
+  renderCards();
+  renderChart();
+  renderProximaFatura();
+  renderExtrato();
+  renderFixas();
+  renderFaturas();
 }
 
-function renderFixas(items) {
-  const lista = document.getElementById('fixas');
-  const footer = document.getElementById('fixasFooter');
-  lista.innerHTML = '';
-
-  if (!items.length) {
-    lista.innerHTML = '<li class="empty-state">Nenhuma despesa fixa cadastrada.</li>';
-    if (footer) footer.innerHTML = '';
-    return;
-  }
-
-  const visiveis = items.slice(0, limiteFixas);
-
-  visiveis.forEach((fixa) => {
-    const valorNum = Number(fixa.valor_padrao || 0);
-    const valorTexto = Number.isNaN(valorNum) ? '0,00' : valorNum.toFixed(2).replace('.', ',');
-
-    const obj = {
-      id: fixa.id_fixa || '',
-      descricao: fixa.descricao || '',
-      categoria: fixa.categoria || 'Outros',
-      valor_padrao: fixa.valor_padrao || 0,
-      dia_vencimento: fixa.dia_vencimento || '',
-      ativo: fixa.ativo || 'sim',
-      observacoes: fixa.observacoes || ''
-    };
-
-    const li = document.createElement('li');
-    li.innerHTML = `
-      <div class="item-row">
-        <div class="item-main">
-          <span class="item-title">${escapeHtml(obj.descricao)}</span>
-          <span class="item-subtitle">${escapeHtml(obj.categoria)} • dia ${escapeHtml(String(obj.dia_vencimento))} • ${escapeHtml(obj.ativo)}</span>
-        </div>
-        <div class="item-actions">
-          <span class="item-value despesa">R$ ${valorTexto}</span>
-          <div class="action-buttons">
-            <button class="mini-btn" onclick='editarFixa(${JSON.stringify(obj)})'>Editar</button>
-            <button class="mini-btn danger" onclick="excluirFixa('${escapeHtml(obj.id)}')">Excluir</button>
-          </div>
-        </div>
-      </div>
-    `;
-    lista.appendChild(li);
-  });
-
-  if (footer) {
-    footer.innerHTML = `
-      <button class="btn btn-secondary btn-small" type="button" onclick="toggleFixas(${items.length})">
-        ${limiteFixas >= items.length ? '− Ver menos' : '+ Ver mais'}
-      </button>
-    `;
-  }
+function renderCards() {
+  const cards = state.dashboard.cards || {};
+  el.cardSaldoReal.textContent = money(cards.saldo_real || 0);
+  el.cardSaldoProjetado.textContent = money(cards.saldo_projetado || 0);
+  el.cardReceitas.textContent = money(cards.receitas_recebidas || 0);
+  el.cardDespesas.textContent = money(cards.despesas_previstas || 0);
 }
 
-function renderChartCategorias(data) {
-  const canvas = document.getElementById('chartCategorias');
-  if (!canvas) return;
-
-  const labels = data.map(item => item.categoria);
-  const values = data.map(item => item.valor);
-  const total = values.reduce((acc, val) => acc + val, 0);
-
-  const centerTextPlugin = {
-    id: 'centerTextPlugin',
-    afterDraw(chart) {
-      const { ctx } = chart;
-      const meta = chart.getDatasetMeta(0);
-      if (!meta || !meta.data || !meta.data.length) return;
-
-      const x = meta.data[0].x;
-      const y = meta.data[0].y;
-
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#e5e7eb';
-      ctx.font = '700 14px Segoe UI';
-      ctx.fillText('Total', x, y - 10);
-      ctx.font = '800 18px Segoe UI';
-      ctx.fillText(`R$ ${total.toFixed(2).replace('.', ',')}`, x, y + 12);
-      ctx.restore();
-    }
-  };
-
-  if (chartCategorias) {
-    chartCategorias.destroy();
-  }
-
-  chartCategorias = new Chart(canvas, {
+function renderChart() {
+  const data = state.dashboard.grafico_categorias || [];
+  const ctx = document.getElementById('chartCategorias');
+  if (chartCategorias) chartCategorias.destroy();
+  chartCategorias = new Chart(ctx, {
     type: 'doughnut',
     data: {
-      labels,
-      datasets: [{
-        data: values,
-        borderWidth: 2,
-        hoverOffset: 6
-      }]
+      labels: data.map(i => i.categoria),
+      datasets: [{ data: data.map(i => i.valor) }],
     },
     options: {
-      responsive: true,
       maintainAspectRatio: false,
       cutout: '62%',
       plugins: {
-        legend: {
-          position: 'top',
-          labels: {
-            color: '#e5e7eb',
-            boxWidth: 16,
-            padding: 10
-          }
-        }
-      }
+        legend: { position: 'bottom', labels: { color: '#e5e7eb' } },
+      },
     },
-    plugins: [centerTextPlugin]
+    plugins: [{
+      id: 'centerText',
+      afterDraw(chart) {
+        const { ctx } = chart;
+        const total = data.reduce((s, i) => s + Number(i.valor || 0), 0);
+        ctx.save();
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#e5e7eb';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(money(total), chart.width / 2, chart.height / 2);
+        ctx.restore();
+      }
+    }]
   });
 }
 
-function filtrarExtratoLocal() {
-  const texto = (document.getElementById('buscaTexto').value || '').trim().toLowerCase();
-  const categoria = document.getElementById('filtroCategoriaLocal').value || '';
-  const status = document.getElementById('filtroStatusLocal').value || '';
-  const forma = document.getElementById('filtroFormaLocal').value || '';
-  const conta = document.getElementById('filtroContaLocal').value || '';
-
-  const filtrado = extratoCache.filter(item => {
-    const okTexto = !texto || String(item.descricao || '').toLowerCase().includes(texto);
-    const okCategoria = !categoria || String(item.categoria || '') === categoria;
-    const okStatus = !status || String(item.status || '') === status;
-    const okForma = !forma || String(item.forma_pagamento || '') === forma;
-    const okConta = !conta || String(item.conta_pagamento || '') === conta;
-    return okTexto && okCategoria && okStatus && okForma && okConta;
-  });
-
-  limiteExtrato = LIMITE_INICIAL_EXT;
-  renderExtrato(filtrado);
+function renderProximaFatura() {
+  const f = state.dashboard.proxima_fatura;
+  if (!f) {
+    el.proximaFatura.innerHTML = '<div class="empty-state">Nenhuma fatura disponível.</div>';
+    return;
+  }
+  el.proximaFatura.innerHTML = `
+    <div class="list-item">
+      <div class="list-item-top">
+        <div>
+          <strong>${escapeHtml(f.nome_cartao)}</strong>
+          <small>Competência ${escapeHtml(f.competencia)} • vence em ${formatDateBR(f.data_vencimento)}</small>
+        </div>
+        <strong>${money(f.valor_total)}</strong>
+      </div>
+      <div class="inline-actions">
+        <span class="badge ${slugify(f.status)}">${escapeHtml(f.status)}</span>
+      </div>
+    </div>`;
 }
 
-function aplicarFiltros() {
-  limiteLancamentos = LIMITE_INICIAL_LANC;
-  limiteVencimentos = LIMITE_INICIAL_VENC;
-  limiteExtrato = LIMITE_INICIAL_EXT;
-  load();
+function renderExtrato() {
+  const items = filteredLancamentos();
+  if (!items.length) {
+    el.extratoList.innerHTML = '<div class="empty-state">Nenhum lançamento encontrado.</div>';
+    return;
+  }
+  el.extratoList.innerHTML = items.map(item => `
+    <div class="list-item">
+      <div class="list-item-top">
+        <div>
+          <strong>${escapeHtml(item.descricao)}</strong>
+          <small>${formatDateBR(item.data)} • ${escapeHtml(item.categoria)}${item.conta_pagamento ? ' • ' + escapeHtml(item.conta_pagamento) : ''}</small>
+        </div>
+        <div style="text-align:right">
+          <strong>${item.tipo === 'receita' ? '+' : '-'} ${money(item.valor)}</strong>
+          <span class="badge ${slugify(item.status)}">${escapeHtml(item.status)}</span>
+        </div>
+      </div>
+    </div>`).join('');
 }
 
-function limparFiltros() {
-  document.getElementById('filtroMes').value = String(new Date().getMonth() + 1).padStart(2, '0');
-  document.getElementById('filtroAno').value = String(new Date().getFullYear());
-  document.getElementById('filtroInicio').value = '';
-  document.getElementById('filtroFim').value = '';
-  limiteLancamentos = LIMITE_INICIAL_LANC;
-  limiteVencimentos = LIMITE_INICIAL_VENC;
-  limiteExtrato = LIMITE_INICIAL_EXT;
-  load();
-}
+function renderFixas() {
+  const comp = `${el.filterYear.value}-${String(el.filterMonth.value).padStart(2, '0')}`;
+  const materializadas = new Set(state.lancamentos.filter(l => l.origem_fixa && l.competencia === comp).map(l => l.origem_fixa));
+  const items = state.fixas.filter(f => (f.ativo || '').toLowerCase() === 'sim');
 
-function toggleLancamentos(total) {
-  limiteLancamentos = limiteLancamentos >= total ? LIMITE_INICIAL_LANC : total;
-  renderLancamentos(extratoCache.slice(0, 10_000));
-  load();
-}
-
-function toggleVencimentos(total) {
-  limiteVencimentos = limiteVencimentos >= total ? LIMITE_INICIAL_VENC : total;
-  load();
-}
-
-function toggleFixas(total) {
-  limiteFixas = limiteFixas >= total ? LIMITE_INICIAL_FIX : total;
-  renderFixas(fixasCache);
-}
-
-function toggleExtrato(total) {
-  limiteExtrato = limiteExtrato >= total ? LIMITE_INICIAL_EXT : total;
-  filtrarExtratoLocal();
-}
-
-function openModal() {
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('modalTitle').textContent = 'Novo lançamento';
-  document.getElementById('saveButton').textContent = 'Salvar';
-  lancamentoEditandoId = null;
-
-  const hoje = new Date().toISOString().slice(0, 10);
-  document.getElementById('dataLancamento').value = hoje;
-}
-
-function closeModal() {
-  document.getElementById('modal').classList.add('hidden');
-}
-
-function openFixaModal() {
-  document.getElementById('fixaModal').classList.remove('hidden');
-  document.getElementById('fixaModalTitle').textContent = 'Nova despesa fixa';
-  document.getElementById('saveFixaButton').textContent = 'Salvar';
-  fixaEditandoId = null;
-}
-
-function closeFixaModal() {
-  document.getElementById('fixaModal').classList.add('hidden');
-}
-
-function limparFormulario() {
-  document.getElementById('desc').value = '';
-  document.getElementById('valor').value = '';
-  document.getElementById('tipo').value = 'receita';
-  document.getElementById('categoria').selectedIndex = 0;
-  document.getElementById('status').value = 'pendente';
-  document.getElementById('dataLancamento').value = '';
-  document.getElementById('vencimento').value = '';
-  document.getElementById('observacoes').value = '';
-  document.getElementById('formaPagamento').selectedIndex = 0;
-  document.getElementById('contaPagamento').selectedIndex = 0;
-  lancamentoEditandoId = null;
-}
-
-function limparFormularioFixa() {
-  document.getElementById('fixaDesc').value = '';
-  document.getElementById('fixaCategoria').selectedIndex = 0;
-  document.getElementById('fixaValor').value = '';
-  document.getElementById('fixaDia').value = '';
-  document.getElementById('fixaAtivo').value = 'sim';
-  document.getElementById('fixaObs').value = '';
-  fixaEditandoId = null;
-}
-
-function editarLancamento(item) {
-  lancamentoEditandoId = item.id;
-  document.getElementById('modal').classList.remove('hidden');
-  document.getElementById('modalTitle').textContent = 'Editar lançamento';
-  document.getElementById('saveButton').textContent = 'Atualizar';
-
-  document.getElementById('desc').value = item.descricao || '';
-  document.getElementById('valor').value = (item.valor || '0,00').replace(',', '.');
-  document.getElementById('tipo').value = item.tipo || 'despesa';
-  document.getElementById('dataLancamento').value = item.data || '';
-  document.getElementById('vencimento').value = item.vencimento || '';
-  document.getElementById('categoria').value = item.categoria || 'Outros';
-  document.getElementById('status').value = item.status || 'pendente';
-  document.getElementById('observacoes').value = item.observacoes || '';
-  document.getElementById('formaPagamento').value = item.forma_pagamento || formasPagamentoCache[0] || '';
-  document.getElementById('contaPagamento').value = item.conta_pagamento || contasPagamentoCache[0] || '';
-}
-
-function editarFixa(fixa) {
-  fixaEditandoId = fixa.id;
-  document.getElementById('fixaModal').classList.remove('hidden');
-  document.getElementById('fixaModalTitle').textContent = 'Editar despesa fixa';
-  document.getElementById('saveFixaButton').textContent = 'Atualizar';
-
-  document.getElementById('fixaDesc').value = fixa.descricao || '';
-  document.getElementById('fixaCategoria').value = fixa.categoria || 'Outros';
-  document.getElementById('fixaValor').value = Number(fixa.valor_padrao || 0);
-  document.getElementById('fixaDia').value = fixa.dia_vencimento || '';
-  document.getElementById('fixaAtivo').value = fixa.ativo || 'sim';
-  document.getElementById('fixaObs').value = fixa.observacoes || '';
-}
-
-function editarFixaPorId(idFixa) {
-  const fixa = fixasCache.find(f => String(f.id_fixa) === String(idFixa));
-  if (!fixa) {
-    showToast('Despesa fixa não encontrada.', 'error');
+  if (!items.length) {
+    el.fixasList.innerHTML = '<div class="empty-state">Nenhuma fixa cadastrada.</div>';
     return;
   }
 
-  editarFixa({
-    id: fixa.id_fixa,
-    descricao: fixa.descricao,
-    categoria: fixa.categoria,
-    valor_padrao: fixa.valor_padrao,
-    dia_vencimento: fixa.dia_vencimento,
-    ativo: fixa.ativo,
-    observacoes: fixa.observacoes
+  el.fixasList.innerHTML = items.map(item => {
+    const jaPaga = materializadas.has(item.id_fixa);
+    return `
+      <div class="list-item">
+        <div class="list-item-top">
+          <div>
+            <strong>${escapeHtml(item.descricao)}</strong>
+            <small>${escapeHtml(item.categoria)} • vence dia ${escapeHtml(item.dia_vencimento)}</small>
+          </div>
+          <strong>${money(item.valor_padrao)}</strong>
+        </div>
+        <div class="inline-actions">
+          <span class="badge ${jaPaga ? 'pago' : 'pendente'}">${jaPaga ? 'materializada' : 'prevista'}</span>
+          ${jaPaga ? '' : `<button onclick="payFixa('${item.id_fixa}')">Pagar</button>`}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderFaturas() {
+  if (!state.faturas.length && !state.cartoes.length) {
+    el.faturasList.innerHTML = '<div class="empty-state">Nenhum cartão cadastrado.</div>';
+    return;
+  }
+
+  const parts = [];
+  if (state.cartoes.length) {
+    parts.push(...state.cartoes.map(c => {
+      const usadas = state.lancamentos.filter(l => l.id_cartao === c.id_cartao).reduce((s, l) => s + Number(l.valor || 0), 0);
+      return `
+        <div class="list-item">
+          <div class="list-item-top">
+            <div>
+              <strong>${escapeHtml(c.nome_cartao)}</strong>
+              <small>Fecha dia ${escapeHtml(c.dia_fechamento)} • vence dia ${escapeHtml(c.dia_vencimento)}</small>
+            </div>
+            <div style="text-align:right">
+              <strong>${money(usadas)}</strong>
+              <small>limite ${money(c.limite || 0)}</small>
+            </div>
+          </div>
+        </div>`;
+    }));
+  }
+  if (state.faturas.length) {
+    parts.push(...state.faturas.map(f => `
+      <div class="list-item">
+        <div class="list-item-top">
+          <div>
+            <strong>Fatura ${escapeHtml(f.nome_cartao)}</strong>
+            <small>${escapeHtml(f.competencia)} • fechamento ${formatDateBR(f.data_fechamento)} • vencimento ${formatDateBR(f.data_vencimento)}</small>
+          </div>
+          <div style="text-align:right">
+            <strong>${money(f.valor_total)}</strong>
+            <span class="badge ${slugify(f.status)}">${escapeHtml(f.status)}</span>
+          </div>
+        </div>
+      </div>`
+    ));
+  }
+
+  el.faturasList.innerHTML = parts.join('');
+}
+
+function filteredLancamentos() {
+  return state.lancamentos.filter(item => {
+    if (el.filterCategory.value && item.categoria !== el.filterCategory.value) return false;
+    if (el.filterStatus.value && item.status !== el.filterStatus.value) return false;
+    if (el.filterForma.value && item.forma_pagamento !== el.filterForma.value) return false;
+    if (el.filterConta.value && item.conta_pagamento !== el.filterConta.value) return false;
+    return true;
   });
 }
 
-async function salvar() {
-  const descricao = document.getElementById('desc').value.trim();
-  const valor = document.getElementById('valor').value.trim();
-  const tipo = document.getElementById('tipo').value;
-  const data = document.getElementById('dataLancamento').value;
-  const vencimento = document.getElementById('vencimento').value;
-  const categoria = document.getElementById('categoria').value || 'Outros';
-  const observacoes = document.getElementById('observacoes').value.trim();
-  const formaPagamento = document.getElementById('formaPagamento').value || '';
-  const contaPagamento = document.getElementById('contaPagamento').value || '';
-  let status = document.getElementById('status').value;
-
-  if (!descricao || !valor || !data) {
-    showToast('Preencha descrição, valor e data.', 'error');
-    return;
-  }
-
-  const valorNumero = Number(valor);
-  if (Number.isNaN(valorNumero) || valorNumero <= 0) {
-    showToast('Informe um valor válido maior que zero.', 'error');
-    return;
-  }
-
-  if (tipo === 'receita' && status === 'pago') status = 'recebido';
-  if (tipo === 'despesa' && status === 'recebido') status = 'pago';
-
-  const payload = {
-    descricao,
-    valor: valorNumero,
-    tipo,
-    data,
-    vencimento,
-    categoria,
-    status,
-    observacoes,
-    forma_pagamento: formaPagamento,
-    conta_pagamento: contaPagamento
-  };
-
-  try {
-    const isEdit = Boolean(lancamentoEditandoId);
-    const resp = isEdit
-      ? await apiPost({ action: 'updateLancamento', id: lancamentoEditandoId, ...payload })
-      : await apiPost({ action: 'addLancamento', ...payload });
-
-    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao salvar.');
-
-    limparFormulario();
-    closeModal();
-    showToast(isEdit ? 'Lançamento atualizado.' : 'Lançamento salvo com sucesso.', 'success');
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao salvar: ${error.message}`, 'error');
-  }
+async function onSaveLancamento(ev) {
+  ev.preventDefault();
+  const data = Object.fromEntries(new FormData(el.formLancamento).entries());
+  await postAction('saveLancamento', data);
+  el.modalLancamento.close();
+  await loadBootstrap();
 }
 
-async function salvarFixa() {
-  const descricao = document.getElementById('fixaDesc').value.trim();
-  const categoria = document.getElementById('fixaCategoria').value || 'Outros';
-  const valor = document.getElementById('fixaValor').value.trim();
-  const dia = document.getElementById('fixaDia').value.trim();
-  const ativo = document.getElementById('fixaAtivo').value;
-  const observacoes = document.getElementById('fixaObs').value.trim();
-
-  if (!descricao || !dia) {
-    showToast('Preencha descrição e dia do vencimento.', 'error');
-    return;
-  }
-
-  const diaNumero = Number(dia);
-  if (Number.isNaN(diaNumero) || diaNumero < 1 || diaNumero > 31) {
-    showToast('Informe um dia válido entre 1 e 31.', 'error');
-    return;
-  }
-
-  const payload = {
-    descricao,
-    categoria,
-    valor_padrao: Number(valor || 0),
-    dia_vencimento: diaNumero,
-    ativo,
-    observacoes
-  };
-
-  try {
-    const isEdit = Boolean(fixaEditandoId);
-    const resp = isEdit
-      ? await apiPost({ action: 'updateFixa', id: fixaEditandoId, ...payload })
-      : await apiPost({ action: 'addFixa', ...payload });
-
-    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao salvar despesa fixa.');
-
-    limparFormularioFixa();
-    closeFixaModal();
-    showToast(isEdit ? 'Despesa fixa atualizada.' : 'Despesa fixa cadastrada.', 'success');
-    await carregarFixas();
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao salvar fixa: ${error.message}`, 'error');
-  }
+async function onSaveFixa(ev) {
+  ev.preventDefault();
+  const data = Object.fromEntries(new FormData(el.formFixa).entries());
+  await postAction('saveFixa', data);
+  el.modalFixa.close();
+  await loadBootstrap();
 }
 
-async function atualizarStatus(id, status) {
-  try {
-    const resp = await apiPost({ action: 'updateStatus', id, status });
-    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao atualizar status.');
-
-    showToast('Status atualizado.', 'success');
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao atualizar status: ${error.message}`, 'error');
-  }
+async function onSaveCartao(ev) {
+  ev.preventDefault();
+  const data = Object.fromEntries(new FormData(el.formCartao).entries());
+  await postAction('saveCartao', data);
+  el.modalCartao.close();
+  await loadBootstrap();
 }
 
-function abrirPagamentoFixa(idFixa, competencia) {
-  const conta = prompt('Qual cartão/conta foi usado? Ex: Santander');
-  if (conta === null) return;
-
-  const forma = prompt('Forma de pagamento? Ex: Crédito, Débito, Pix', 'Crédito');
+async function payFixa(id) {
+  const forma = prompt('Forma de pagamento (Pix, Débito, Crédito, etc.):', 'Pix');
   if (forma === null) return;
+  let conta = '';
+  if ((forma || '').toLowerCase() === 'crédito' || (forma || '').toLowerCase() === 'credito') {
+    conta = prompt('Nome do cartão cadastrado:', state.cartoes[0]?.nome_cartao || '');
+    if (conta === null) return;
+  } else {
+    conta = prompt('Conta usada (opcional):', '');
+    if (conta === null) return;
+  }
+  await postAction('payFixa', { id, data: { data: new Date().toISOString().slice(0,10), forma_pagamento: forma, conta_pagamento: conta, status: 'pago' } }, true);
+  await loadBootstrap();
+}
+window.payFixa = payFixa;
 
-  marcarFixaComoPaga(idFixa, competencia, forma, conta);
+async function postAction(action, data, raw = false) {
+  const payload = raw ? data : { action, data };
+  if (!raw) payload.action = action;
+  const body = new URLSearchParams();
+  body.append('payload', JSON.stringify(payload));
+  const res = await fetch(API_URL, { method: 'POST', body });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Falha ao salvar');
+  return json;
 }
 
-async function marcarFixaComoPaga(idFixa, competencia, formaPagamento, contaPagamento) {
-  try {
-    const resp = await apiPost({
-      action: 'materializeFixa',
-      id_fixa: idFixa,
-      competencia,
-      status: 'pago',
-      forma_pagamento: formaPagamento || 'Crédito',
-      conta_pagamento: contaPagamento || ''
-    });
+function fillSelect(select, values, placeholder) {
+  const current = select.value;
+  select.innerHTML = '';
+  if (placeholder !== undefined) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = placeholder;
+    select.appendChild(opt);
+  }
+  values.forEach(value => {
+    if (value === '') return;
+    const opt = document.createElement('option');
+    opt.value = value;
+    opt.textContent = value;
+    select.appendChild(opt);
+  });
+  select.value = current;
+}
 
-    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao lançar despesa fixa.');
+function openDialog(dialog) {
+  if (typeof dialog.showModal === 'function') dialog.showModal();
+}
 
-    showToast('Despesa fixa marcada como paga.', 'success');
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao marcar fixa: ${error.message}`, 'error');
+function registerServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').catch(() => {});
   }
 }
 
-async function excluirLancamento(id) {
-  if (!confirm('Deseja realmente excluir este lançamento?')) return;
-
-  try {
-    const resp = await apiPost({ action: 'deleteLancamento', id });
-    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao excluir lançamento.');
-
-    showToast('Lançamento excluído.', 'success');
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao excluir: ${error.message}`, 'error');
-  }
+function money(value) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 }
 
-async function excluirFixa(id) {
-  if (!confirm('Deseja realmente excluir esta despesa fixa?')) return;
-
-  try {
-    const resp = await apiPost({ action: 'deleteFixa', id });
-    if (resp?.status !== 'ok') throw new Error(resp.message || 'Falha ao excluir despesa fixa.');
-
-    showToast('Despesa fixa excluída.', 'success');
-    await carregarFixas();
-    await load();
-  } catch (error) {
-    console.error(error);
-    showToast(`Erro ao excluir fixa: ${error.message}`, 'error');
-  }
+function formatDateBR(value) {
+  if (!value) return '-';
+  const [y, m, d] = String(value).split('-');
+  return `${d}/${m}/${y}`;
 }
 
-function showToast(message, type = 'success') {
-  const toast = document.getElementById('toast');
-  toast.textContent = message;
-  toast.className = `toast ${type}`;
-  toast.classList.remove('hidden');
-
-  setTimeout(() => {
-    toast.classList.add('hidden');
-  }, 3000);
+function unique(arr) {
+  return [...new Set(arr.filter(Boolean))];
 }
 
-function formatDate(value) {
-  try {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString('pt-BR');
-  } catch {
-    return value;
-  }
+function slugify(v) {
+  return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
 }
 
-function escapeHtml(text) {
-  return String(text)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
-
-window.addEventListener('click', function (event) {
-  const modal = document.getElementById('modal');
-  const fixaModal = document.getElementById('fixaModal');
-
-  if (event.target === modal) closeModal();
-  if (event.target === fixaModal) closeFixaModal();
-});
-
-document.addEventListener('input', (event) => {
-  if (event.target?.id === 'buscaTexto') {
-    filtrarExtratoLocal();
-  }
-});
-
-document.addEventListener('change', (event) => {
-  const ids = ['filtroCategoriaLocal', 'filtroStatusLocal', 'filtroFormaLocal', 'filtroContaLocal'];
-  if (ids.includes(event.target?.id)) {
-    filtrarExtratoLocal();
-  }
-});
-
-init();
