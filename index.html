@@ -1,303 +1,223 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Financeiro Pessoal</title>
-  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financeiro 2.0</title>
+  <meta name="theme-color" content="#111827" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
-  <div class="app-shell">
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Controle financeiro</p>
-        <h1>💰 Financeiro Pessoal</h1>
+  <header class="topbar">
+    <div>
+      <h1>Financeiro 2.0</h1>
+      <p>Controle financeiro pessoal com cara de app</p>
+    </div>
+    <button class="secondary" id="btnRefresh">Atualizar</button>
+  </header>
+
+  <main class="app-shell">
+    <section class="filters card">
+      <div class="grid two">
+        <label>
+          <span>Mês</span>
+          <select id="filterMonth"></select>
+        </label>
+        <label>
+          <span>Ano</span>
+          <select id="filterYear"></select>
+        </label>
       </div>
-    </header>
-
-    <main class="container">
-      <section class="panel filters-panel">
-        <div class="panel-header">
-          <h2>🔎 Filtros</h2>
-        </div>
-
-        <div class="form-row filters-grid">
-          <div class="form-group">
-            <label for="filtroMes">Mês</label>
-            <select id="filtroMes"></select>
-          </div>
-
-          <div class="form-group">
-            <label for="filtroAno">Ano</label>
-            <select id="filtroAno"></select>
-          </div>
-
-          <div class="form-group">
-            <label for="filtroInicio">Data inicial</label>
-            <input id="filtroInicio" type="date">
-          </div>
-
-          <div class="form-group">
-            <label for="filtroFim">Data final</label>
-            <input id="filtroFim" type="date">
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button class="btn btn-primary" type="button" onclick="aplicarFiltros()">Aplicar</button>
-          <button class="btn btn-secondary" type="button" onclick="limparFiltros()">Limpar</button>
-        </div>
-      </section>
-
-      <section id="dashboard" class="dashboard-grid">
-        <div class="summary-card balance">
-          <span class="card-label">Saldo real</span>
-          <strong id="saldoReal">R$ 0,00</strong>
-        </div>
-
-        <div class="summary-card projected">
-          <span class="card-label">Saldo projetado</span>
-          <strong id="saldoProjetado">R$ 0,00</strong>
-        </div>
-
-        <div class="summary-card income">
-          <span class="card-label">Receitas recebidas</span>
-          <strong id="receitasReais">R$ 0,00</strong>
-        </div>
-
-        <div class="summary-card expense">
-          <span class="card-label">Despesas previstas</span>
-          <strong id="despesasProjetadas">R$ 0,00</strong>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>📊 Gráfico por categoria</h2>
-          <span class="panel-badge">período</span>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="chartCategorias"></canvas>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>📅 Próximos vencimentos</h2>
-          <span class="panel-badge">alertas</span>
-        </div>
-        <ul id="vencimentos" class="styled-list">
-          <li class="empty-state">Nenhum vencimento próximo.</li>
-        </ul>
-        <div id="vencimentosFooter" class="panel-actions"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>📋 Lançamentos recentes</h2>
-          <span class="panel-badge">últimos</span>
-        </div>
-        <ul id="lancamentos" class="styled-list">
-          <li class="empty-state">Carregando...</li>
-        </ul>
-        <div id="lancamentosFooter" class="panel-actions"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>🧾 Extrato completo</h2>
-          <span class="panel-badge">filtros locais</span>
-        </div>
-
-        <div class="form-row filters-grid extrato-grid">
-          <div class="form-group">
-            <label for="buscaTexto">Buscar</label>
-            <input id="buscaTexto" type="text" placeholder="Descrição...">
-          </div>
-
-          <div class="form-group">
-            <label for="filtroCategoriaLocal">Categoria</label>
-            <select id="filtroCategoriaLocal"></select>
-          </div>
-
-          <div class="form-group">
-            <label for="filtroStatusLocal">Status</label>
-            <select id="filtroStatusLocal">
-              <option value="">Todos</option>
-              <option value="previsto">Previsto</option>
-              <option value="pendente">Pendente</option>
-              <option value="pago">Pago</option>
-              <option value="recebido">Recebido</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="filtroFormaLocal">Forma de pagamento</label>
-            <select id="filtroFormaLocal"></select>
-          </div>
-
-          <div class="form-group">
-            <label for="filtroContaLocal">Conta / Cartão</label>
-            <select id="filtroContaLocal"></select>
-          </div>
-        </div>
-
-        <ul id="extrato" class="styled-list">
-          <li class="empty-state">Nenhum item encontrado.</li>
-        </ul>
-        <div id="extratoFooter" class="panel-actions"></div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-header">
-          <h2>🔁 Despesas fixas</h2>
-          <span class="panel-badge">mensais</span>
-        </div>
-        <ul id="fixas" class="styled-list">
-          <li class="empty-state">Nenhuma despesa fixa cadastrada.</li>
-        </ul>
-        <div id="fixasFooter" class="panel-actions"></div>
-        <div class="panel-actions">
-          <button class="btn btn-secondary btn-inline" type="button" onclick="openFixaModal()">Nova despesa fixa</button>
-        </div>
-      </section>
-    </main>
-
-    <button type="button" class="fab" onclick="openModal()" aria-label="Novo lançamento">+</button>
-  </div>
-
-  <div id="modal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="modalTitle">Novo lançamento</h2>
-        <button type="button" class="icon-close" onclick="closeModal()">×</button>
-      </div>
-
-      <div class="form-group">
-        <label for="desc">Descrição</label>
-        <input id="desc" type="text" placeholder="Ex: Combustível, salário, internet" maxlength="120">
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="valor">Valor</label>
-          <input id="valor" type="number" step="0.01" min="0" placeholder="0,00">
-        </div>
-
-        <div class="form-group">
-          <label for="tipo">Tipo</label>
-          <select id="tipo">
-            <option value="receita">Receita</option>
-            <option value="despesa">Despesa</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="dataLancamento">Data</label>
-          <input id="dataLancamento" type="date">
-        </div>
-
-        <div class="form-group">
-          <label for="vencimento">Vencimento</label>
-          <input id="vencimento" type="date">
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="categoria">Categoria</label>
-          <select id="categoria"></select>
-        </div>
-
-        <div class="form-group">
-          <label for="status">Status</label>
-          <select id="status">
-            <option value="pendente">Pendente</option>
+      <div class="grid two">
+        <label>
+          <span>Categoria</span>
+          <select id="filterCategory"><option value="">Todas</option></select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select id="filterStatus">
+            <option value="">Todos</option>
             <option value="pago">Pago</option>
+            <option value="pendente">Pendente</option>
             <option value="recebido">Recebido</option>
           </select>
+        </label>
+      </div>
+      <div class="grid two">
+        <label>
+          <span>Forma</span>
+          <select id="filterForma"><option value="">Todas</option></select>
+        </label>
+        <label>
+          <span>Conta / Cartão</span>
+          <select id="filterConta"><option value="">Todos</option></select>
+        </label>
+      </div>
+    </section>
+
+    <section class="cards-grid">
+      <article class="metric card">
+        <small>Saldo real</small>
+        <strong id="cardSaldoReal">R$ 0,00</strong>
+      </article>
+      <article class="metric card">
+        <small>Saldo projetado</small>
+        <strong id="cardSaldoProjetado">R$ 0,00</strong>
+      </article>
+      <article class="metric card">
+        <small>Receitas recebidas</small>
+        <strong id="cardReceitas">R$ 0,00</strong>
+      </article>
+      <article class="metric card">
+        <small>Despesas previstas</small>
+        <strong id="cardDespesas">R$ 0,00</strong>
+      </article>
+    </section>
+
+    <section class="grid-layout">
+      <article class="card chart-card">
+        <div class="section-head">
+          <h2>Despesas por categoria</h2>
         </div>
-      </div>
+        <div class="chart-wrap"><canvas id="chartCategorias"></canvas></div>
+      </article>
 
-      <div class="form-row">
-        <div class="form-group">
-          <label for="formaPagamento">Forma de pagamento</label>
-          <select id="formaPagamento"></select>
+      <article class="card next-card">
+        <div class="section-head">
+          <h2>Próxima fatura</h2>
         </div>
+        <div id="proximaFatura" class="empty-state">Nenhuma fatura disponível.</div>
+      </article>
+    </section>
 
-        <div class="form-group">
-          <label for="contaPagamento">Conta / Cartão</label>
-          <select id="contaPagamento"></select>
-        </div>
+    <section class="card">
+      <div class="section-head">
+        <h2>Lançamentos</h2>
       </div>
+      <div id="extratoList" class="list"></div>
+    </section>
 
-      <div class="form-group">
-        <label for="observacoes">Observações</label>
-        <input id="observacoes" type="text" placeholder="Opcional">
+    <section class="card">
+      <div class="section-head">
+        <h2>Despesas fixas previstas</h2>
+        <button class="secondary" id="btnNewFixa">Nova fixa</button>
       </div>
+      <div id="fixasList" class="list"></div>
+    </section>
 
-      <div class="modal-actions">
-        <button id="saveButton" type="button" class="btn btn-primary" onclick="salvar()">Salvar</button>
-        <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+    <section class="card">
+      <div class="section-head">
+        <h2>Cartões e faturas</h2>
+        <button class="secondary" id="btnNewCartao">Novo cartão</button>
       </div>
-    </div>
-  </div>
+      <div id="faturasList" class="list"></div>
+    </section>
+  </main>
 
-  <div id="fixaModal" class="modal hidden">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="fixaModalTitle">Nova despesa fixa</h2>
-        <button type="button" class="icon-close" onclick="closeFixaModal()">×</button>
+  <button class="fab" id="btnNewLancamento">+</button>
+
+  <nav class="bottom-nav">
+    <a href="#" class="active">Dashboard</a>
+    <a href="#extratoList">Lançamentos</a>
+    <a href="#fixasList">Fixas</a>
+    <a href="#faturasList">Faturas</a>
+  </nav>
+
+  <dialog id="modalLancamento">
+    <form method="dialog" id="formLancamento" class="modal-form">
+      <div class="modal-head">
+        <h3>Novo lançamento</h3>
+        <button class="ghost" value="cancel">✕</button>
       </div>
-
-      <div class="form-group">
-        <label for="fixaDesc">Descrição</label>
-        <input id="fixaDesc" type="text" placeholder="Ex: VIVO">
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="fixaCategoria">Categoria</label>
-          <select id="fixaCategoria"></select>
-        </div>
-
-        <div class="form-group">
-          <label for="fixaValor">Valor padrão</label>
-          <input id="fixaValor" type="number" step="0.01" min="0" placeholder="0,00">
-        </div>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group">
-          <label for="fixaDia">Dia do vencimento</label>
-          <input id="fixaDia" type="number" min="1" max="31" placeholder="20">
-        </div>
-
-        <div class="form-group">
-          <label for="fixaAtivo">Ativo</label>
-          <select id="fixaAtivo">
-            <option value="sim">Sim</option>
-            <option value="nao">Não</option>
+      <div class="grid two">
+        <label><span>Data</span><input type="date" name="data" required /></label>
+        <label><span>Tipo</span>
+          <select name="tipo" required>
+            <option value="despesa">Despesa</option>
+            <option value="receita">Receita</option>
           </select>
-        </div>
+        </label>
       </div>
-
-      <div class="form-group">
-        <label for="fixaObs">Observação</label>
-        <input id="fixaObs" type="text" placeholder="Opcional">
+      <label><span>Categoria</span><select name="categoria" required id="modalCategoria"></select></label>
+      <label><span>Descrição</span><input type="text" name="descricao" required /></label>
+      <div class="grid two">
+        <label><span>Valor</span><input type="number" name="valor" step="0.01" required /></label>
+        <label><span>Status</span>
+          <select name="status">
+            <option value="pago">Pago</option>
+            <option value="pendente">Pendente</option>
+            <option value="recebido">Recebido</option>
+          </select>
+        </label>
       </div>
-
-      <div class="modal-actions">
-        <button id="saveFixaButton" type="button" class="btn btn-primary" onclick="salvarFixa()">Salvar</button>
-        <button type="button" class="btn btn-secondary" onclick="closeFixaModal()">Cancelar</button>
+      <div class="grid two">
+        <label><span>Forma</span>
+          <select name="forma_pagamento" id="modalForma">
+            <option value="">Selecione</option>
+            <option>Pix</option>
+            <option>Débito</option>
+            <option>Crédito</option>
+            <option>Boleto</option>
+            <option>Dinheiro</option>
+            <option>Transferência</option>
+          </select>
+        </label>
+        <label><span>Conta / Cartão</span><select name="conta_pagamento" id="modalConta"><option value="">Selecione</option></select></label>
       </div>
-    </div>
-  </div>
+      <label><span>Observações</span><textarea name="observacoes"></textarea></label>
+      <menu class="modal-actions">
+        <button class="secondary" value="cancel">Cancelar</button>
+        <button value="default">Salvar</button>
+      </menu>
+    </form>
+  </dialog>
 
-  <div id="toast" class="toast hidden"></div>
+  <dialog id="modalFixa">
+    <form method="dialog" id="formFixa" class="modal-form">
+      <div class="modal-head">
+        <h3>Nova despesa fixa</h3>
+        <button class="ghost" value="cancel">✕</button>
+      </div>
+      <label><span>Descrição</span><input type="text" name="descricao" required /></label>
+      <label><span>Categoria</span><select name="categoria" required id="modalFixaCategoria"></select></label>
+      <div class="grid two">
+        <label><span>Valor</span><input type="number" name="valor_padrao" step="0.01" required /></label>
+        <label><span>Dia do vencimento</span><input type="number" name="dia_vencimento" min="1" max="31" required /></label>
+      </div>
+      <label><span>Ativa</span>
+        <select name="ativo"><option value="sim">Sim</option><option value="nao">Não</option></select>
+      </label>
+      <menu class="modal-actions">
+        <button class="secondary" value="cancel">Cancelar</button>
+        <button value="default">Salvar</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="modalCartao">
+    <form method="dialog" id="formCartao" class="modal-form">
+      <div class="modal-head">
+        <h3>Novo cartão</h3>
+        <button class="ghost" value="cancel">✕</button>
+      </div>
+      <label><span>Nome do cartão</span><input type="text" name="nome_cartao" required /></label>
+      <label><span>Banco</span><input type="text" name="banco" /></label>
+      <div class="grid two">
+        <label><span>Dia de fechamento</span><input type="number" name="dia_fechamento" min="1" max="31" required /></label>
+        <label><span>Dia de vencimento</span><input type="number" name="dia_vencimento" min="1" max="31" required /></label>
+      </div>
+      <label><span>Limite</span><input type="number" name="limite" step="0.01" /></label>
+      <label><span>Ativo</span>
+        <select name="ativo"><option value="sim">Sim</option><option value="nao">Não</option></select>
+      </label>
+      <menu class="modal-actions">
+        <button class="secondary" value="cancel">Cancelar</button>
+        <button value="default">Salvar</button>
+      </menu>
+    </form>
+  </dialog>
 
   <script src="config.js"></script>
   <script src="script.js"></script>
