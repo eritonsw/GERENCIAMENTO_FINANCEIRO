@@ -28,7 +28,7 @@
         <p>Acompanhe saldo, despesas, cartões e lançamentos em um visual mais limpo e direto.</p>
       </div>
       <div class="hero-right">
-        <button class="btn btn-success fab-inline" onclick="openLancamentoModal()">+ Novo lançamento</button>
+        <button class="btn btn-success fab-inline" type="button" onclick="openLancamentoModal()">+ Novo lançamento</button>
       </div>
     </section>
 
@@ -141,7 +141,7 @@
             <h3>Lançamentos</h3>
             <p class="panel-subtitle">Últimos registros do período</p>
           </div>
-          <button class="btn btn-ghost" onclick="openLancamentoModal()">Novo</button>
+          <button class="btn btn-ghost" type="button" onclick="openLancamentoModal()">Novo</button>
         </div>
         <div id="listaLancamentos" class="list-container">
           <div class="empty-state">Nenhum lançamento encontrado.</div>
@@ -154,7 +154,7 @@
             <h3>Despesas fixas previstas</h3>
             <p class="panel-subtitle">Controle das recorrências do mês</p>
           </div>
-          <button class="btn btn-ghost" onclick="openFixaModal()">Nova fixa</button>
+          <button class="btn btn-ghost" type="button" onclick="openFixaModal()">Nova fixa</button>
         </div>
         <div id="listaFixas" class="list-container">
           <div class="empty-state">Nenhuma fixa cadastrada.</div>
@@ -167,7 +167,7 @@
             <h3>Cartões e faturas</h3>
             <p class="panel-subtitle">Cartões ativos e visão de fechamento</p>
           </div>
-          <button class="btn btn-ghost" onclick="openCartaoModal()">Novo cartão</button>
+          <button class="btn btn-ghost" type="button" onclick="openCartaoModal()">Novo cartão</button>
         </div>
         <div id="listaCartoes" class="list-container">
           <div class="empty-state">Nenhum cartão cadastrado.</div>
@@ -176,158 +176,180 @@
     </section>
   </main>
 
-  <button class="fab" onclick="openLancamentoModal()" title="Novo lançamento">+</button>
+  <button class="fab" type="button" onclick="openLancamentoModal()" title="Novo lançamento">+</button>
 
   <nav class="bottom-nav">
-    <button class="nav-item active">Dashboard</button>
-    <button class="nav-item" onclick="openLancamentoModal()">Lançamentos</button>
-    <button class="nav-item" onclick="openFixaModal()">Fixas</button>
-    <button class="nav-item" onclick="openCartaoModal()">Faturas</button>
+    <button class="nav-item active" type="button">Dashboard</button>
+    <button class="nav-item" type="button" onclick="openLancamentoModal()">Lançamentos</button>
+    <button class="nav-item" type="button" onclick="openFixaModal()">Fixas</button>
+    <button class="nav-item" type="button" onclick="openCartaoModal()">Faturas</button>
   </nav>
 
-  <form id="formLancamento" class="modal-form">
-  <div class="form-grid">
-    <div class="field">
-      <label for="lancData">Data</label>
-      <input type="date" id="lancData" name="data" required />
-    </div>
+  <!-- MODAL LANCAMENTO -->
+  <div id="modalLancamento" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3>Novo lançamento</h3>
+        <button class="modal-close" type="button" onclick="closeModal('modalLancamento')">×</button>
+      </div>
 
-    <div class="field">
-      <label for="lancTipo">Tipo</label>
-      <select id="lancTipo" name="tipo" required>
-        <option value="despesa">Despesa</option>
-        <option value="receita">Receita</option>
-      </select>
-    </div>
+      <form id="formLancamento" class="modal-form">
+        <div class="form-grid">
+          <div class="field">
+            <label for="lancData">Data</label>
+            <input type="date" id="lancData" name="data" required />
+          </div>
 
-    <div class="field">
-      <label for="lancCategoria">Categoria</label>
-      <select id="lancCategoria" name="categoria" required></select>
-    </div>
+          <div class="field">
+            <label for="lancTipo">Tipo</label>
+            <select id="lancTipo" name="tipo" required>
+              <option value="despesa">Despesa</option>
+              <option value="receita">Receita</option>
+            </select>
+          </div>
 
-    <div class="field field-span-2">
-      <label for="lancDescricao">Descrição</label>
-      <input type="text" id="lancDescricao" name="descricao" required />
-    </div>
+          <div class="field">
+            <label for="lancCategoria">Categoria</label>
+            <select id="lancCategoria" name="categoria" required></select>
+          </div>
 
-    <div class="field">
-      <label for="lancValor">Valor</label>
-      <input type="number" step="0.01" id="lancValor" name="valor" required />
-    </div>
+          <div class="field field-span-2">
+            <label for="lancDescricao">Descrição</label>
+            <input type="text" id="lancDescricao" name="descricao" required />
+          </div>
 
-    <div class="field">
-      <label for="lancStatus">Status</label>
-      <select id="lancStatus" name="status" required>
-        <option value="pendente">Pendente</option>
-        <option value="pago">Pago</option>
-        <option value="recebido">Recebido</option>
-      </select>
-    </div>
+          <div class="field">
+            <label for="lancValor">Valor</label>
+            <input type="number" step="0.01" id="lancValor" name="valor" required />
+          </div>
 
-    <div class="field">
-      <label for="lancForma">Forma de pagamento</label>
-      <select id="lancForma" name="forma_pagamento">
-        <option value="">Selecione</option>
-        <option value="Pix">Pix</option>
-        <option value="Débito">Débito</option>
-        <option value="Crédito">Crédito</option>
-        <option value="Dinheiro">Dinheiro</option>
-        <option value="Transferência">Transferência</option>
-      </select>
-    </div>
+          <div class="field">
+            <label for="lancStatus">Status</label>
+            <select id="lancStatus" name="status" required>
+              <option value="pendente">Pendente</option>
+              <option value="pago">Pago</option>
+              <option value="recebido">Recebido</option>
+            </select>
+          </div>
 
-    <div class="field">
-      <label for="lancConta">Conta / Cartão</label>
-      <select id="lancConta" name="conta_pagamento">
-        <option value="">Selecione</option>
-      </select>
-    </div>
-  </div>
+          <div class="field">
+            <label for="lancForma">Forma de pagamento</label>
+            <select id="lancForma" name="forma_pagamento">
+              <option value="">Selecione</option>
+              <option value="Pix">Pix</option>
+              <option value="Débito">Débito</option>
+              <option value="Crédito">Crédito</option>
+              <option value="Dinheiro">Dinheiro</option>
+              <option value="Transferência">Transferência</option>
+            </select>
+          </div>
 
-  <div class="modal-actions">
-    <button type="button" class="btn btn-secondary" onclick="closeModal('modalLancamento')">Cancelar</button>
-    <button type="submit" class="btn btn-primary">Salvar</button>
-  </div>
-</form>
+          <div class="field">
+            <label for="lancConta">Conta / Cartão</label>
+            <select id="lancConta" name="conta_pagamento">
+              <option value="">Selecione</option>
+            </select>
+          </div>
+        </div>
 
-  <form id="formFixa" class="modal-form">
-  <div class="form-grid">
-    <div class="field field-span-2">
-      <label for="fixaDescricao">Descrição</label>
-      <input type="text" id="fixaDescricao" name="descricao" required />
-    </div>
-
-    <div class="field">
-      <label for="fixaCategoria">Categoria</label>
-      <select id="fixaCategoria" name="categoria" required></select>
-    </div>
-
-    <div class="field">
-      <label for="fixaValor">Valor padrão</label>
-      <input type="number" step="0.01" id="fixaValor" name="valor_padrao" required />
-    </div>
-
-    <div class="field">
-      <label for="fixaVencimento">Dia do vencimento</label>
-      <input type="number" min="1" max="31" id="fixaVencimento" name="dia_vencimento" required />
-    </div>
-
-    <div class="field">
-      <label for="fixaAtivo">Ativo</label>
-      <select id="fixaAtivo" name="ativo">
-        <option value="sim">Sim</option>
-        <option value="nao">Não</option>
-      </select>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalLancamento')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
     </div>
   </div>
 
-  <div class="modal-actions">
-    <button type="button" class="btn btn-secondary" onclick="closeModal('modalFixa')">Cancelar</button>
-    <button type="submit" class="btn btn-primary">Salvar</button>
+  <!-- MODAL FIXA -->
+  <div id="modalFixa" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3>Nova despesa fixa</h3>
+        <button class="modal-close" type="button" onclick="closeModal('modalFixa')">×</button>
+      </div>
+
+      <form id="formFixa" class="modal-form">
+        <div class="form-grid">
+          <div class="field field-span-2">
+            <label for="fixaDescricao">Descrição</label>
+            <input type="text" id="fixaDescricao" name="descricao" required />
+          </div>
+
+          <div class="field">
+            <label for="fixaCategoria">Categoria</label>
+            <select id="fixaCategoria" name="categoria" required></select>
+          </div>
+
+          <div class="field">
+            <label for="fixaValor">Valor padrão</label>
+            <input type="number" step="0.01" id="fixaValor" name="valor_padrao" required />
+          </div>
+
+          <div class="field">
+            <label for="fixaVencimento">Dia do vencimento</label>
+            <input type="number" min="1" max="31" id="fixaVencimento" name="dia_vencimento" required />
+          </div>
+
+          <div class="field">
+            <label for="fixaAtivo">Ativo</label>
+            <select id="fixaAtivo" name="ativo">
+              <option value="sim">Sim</option>
+              <option value="nao">Não</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" onclick="closeModal('modalFixa')">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Salvar</button>
+        </div>
+      </form>
+    </div>
   </div>
-</form>
 
-  <form id="formCartao" class="modal-form">
-  <div class="form-grid">
-    <div class="field">
-      <label for="cartaoNome">Nome do cartão</label>
-      <input type="text" id="cartaoNome" name="nome_cartao" required />
-    </div>
+  <!-- MODAL CARTAO -->
+  <div id="modalCartao" class="modal">
+    <div class="modal-content">
+      <div class="modal-head">
+        <h3>Novo cartão</h3>
+        <button class="modal-close" type="button" onclick="closeModal('modalCartao')">×</button>
+      </div>
 
-    <div class="field">
-      <label for="cartaoBanco">Banco</label>
-      <input type="text" id="cartaoBanco" name="banco" required />
-    </div>
+      <form id="formCartao" class="modal-form">
+        <div class="form-grid">
+          <div class="field">
+            <label for="cartaoNome">Nome do cartão</label>
+            <input type="text" id="cartaoNome" name="nome_cartao" required />
+          </div>
 
-    <div class="field">
-      <label for="cartaoFechamento">Dia do fechamento</label>
-      <input type="number" min="1" max="31" id="cartaoFechamento" name="dia_fechamento" required />
-    </div>
+          <div class="field">
+            <label for="cartaoBanco">Banco</label>
+            <input type="text" id="cartaoBanco" name="banco" required />
+          </div>
 
-    <div class="field">
-      <label for="cartaoVencimento">Dia do vencimento</label>
-      <input type="number" min="1" max="31" id="cartaoVencimento" name="dia_vencimento" required />
-    </div>
+          <div class="field">
+            <label for="cartaoFechamento">Dia do fechamento</label>
+            <input type="number" min="1" max="31" id="cartaoFechamento" name="dia_fechamento" required />
+          </div>
 
-    <div class="field">
-      <label for="cartaoLimite">Limite</label>
-      <input type="number" step="0.01" id="cartaoLimite" name="limite" />
-    </div>
+          <div class="field">
+            <label for="cartaoVencimento">Dia do vencimento</label>
+            <input type="number" min="1" max="31" id="cartaoVencimento" name="dia_vencimento" required />
+          </div>
 
-    <div class="field">
-      <label for="cartaoAtivo">Ativo</label>
-      <select id="cartaoAtivo" name="ativo">
-        <option value="sim">Sim</option>
-        <option value="nao">Não</option>
-      </select>
-    </div>
-  </div>
+          <div class="field">
+            <label for="cartaoLimite">Limite</label>
+            <input type="number" step="0.01" id="cartaoLimite" name="limite" />
+          </div>
 
-  <div class="modal-actions">
-    <button type="button" class="btn btn-secondary" onclick="closeModal('modalCartao')">Cancelar</button>
-    <button type="submit" class="btn btn-primary">Salvar</button>
-  </div>
-</form>
+          <div class="field">
+            <label for="cartaoAtivo">Ativo</label>
+            <select id="cartaoAtivo" name="ativo">
+              <option value="sim">Sim</option>
+              <option value="nao">Não</option>
+            </select>
+          </div>
+        </div>
 
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" onclick="closeModal('modalCartao')">Cancelar</button>
