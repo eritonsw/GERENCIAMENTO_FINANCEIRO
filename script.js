@@ -1,6 +1,7 @@
 let state = {
   categorias: [],
   cartoes: [],
+  contas: [],
   lancamentos: [],
   fixas: [],
   faturas: [],
@@ -9,37 +10,47 @@ let state = {
 
 let chartCategorias;
 
-const $$ = sel => document.querySelector(sel);
+const $ = (sel) => document.querySelector(sel);
 
 const el = {
-  filterMonth: $$('#filtroMes'),
-  filterYear: $$('#filtroAno'),
-  filterCategory: $$('#filtroCategoria'),
-  filterStatus: $$('#filtroStatus'),
-  filterForma: $$('#filtroForma'),
-  filterConta: $$('#filtroConta'),
+  filterMonth: $('#filtroMes'),
+  filterYear: $('#filtroAno'),
+  filterCategory: $('#filtroCategoria'),
+  filterStatus: $('#filtroStatus'),
+  filterForma: $('#filtroForma'),
+  filterConta: $('#filtroConta'),
 
-  saldoReal: $$('#saldoReal'),
-  saldoProjetado: $$('#saldoProjetado'),
-  receitasRecebidas: $$('#receitasRecebidas'),
-  despesasPrevistas: $$('#despesasPrevistas'),
+  saldoReal: $('#saldoReal'),
+  saldoProjetado: $('#saldoProjetado'),
+  receitasRecebidas: $('#receitasRecebidas'),
+  despesasPrevistas: $('#despesasPrevistas'),
 
-  proximaFatura: $$('#proximaFatura'),
-  listaLancamentos: $$('#listaLancamentos'),
-  listaFixas: $$('#listaFixas'),
-  listaCartoes: $$('#listaCartoes'),
+  proximaFatura: $('#proximaFatura'),
+  listaLancamentos: $('#listaLancamentos'),
+  listaFixas: $('#listaFixas'),
+  listaCartoes: $('#listaCartoes'),
 
-  modalLancamento: $$('#modalLancamento'),
-  modalFixa: $$('#modalFixa'),
-  modalCartao: $$('#modalCartao'),
+  modalLancamento: $('#modalLancamento'),
+  modalFixa: $('#modalFixa'),
+  modalCartao: $('#modalCartao'),
 
-  formLancamento: $$('#formLancamento'),
-  formFixa: $$('#formFixa'),
-  formCartao: $$('#formCartao'),
+  formLancamento: $('#formLancamento'),
+  formFixa: $('#formFixa'),
+  formCartao: $('#formCartao'),
 
-  lancCategoria: $$('#lancCategoria'),
-  lancConta: $$('#lancConta'),
-  fixaCategoria: $$('#fixaCategoria'),
+  lancCategoria: $('#lancCategoria'),
+  lancForma: $('#lancForma'),
+  lancConta: $('#lancConta'),
+  lancCartao: $('#lancCartao'),
+  lancParcelado: $('#lancParcelado'),
+  lancTotalParcelas: $('#lancTotalParcelas'),
+
+  fieldConta: $('#fieldConta'),
+  fieldCartao: $('#fieldCartao'),
+  fieldParcelado: $('#fieldParcelado'),
+  fieldTotalParcelas: $('#fieldTotalParcelas'),
+
+  fixaCategoria: $('#fixaCategoria'),
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -54,7 +65,7 @@ function initFilters() {
 
   for (let m = 1; m <= 12; m++) {
     const opt = document.createElement('option');
-    opt.value = m;
+    opt.value = String(m).padStart(2, '0');
     opt.textContent = String(m).padStart(2, '0');
     if (m === now.getMonth() + 1) opt.selected = true;
     el.filterMonth.appendChild(opt);
@@ -62,8 +73,8 @@ function initFilters() {
 
   for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 2; y++) {
     const opt = document.createElement('option');
-    opt.value = y;
-    opt.textContent = y;
+    opt.value = String(y);
+    opt.textContent = String(y);
     if (y === now.getFullYear()) opt.selected = true;
     el.filterYear.appendChild(opt);
   }
@@ -81,6 +92,9 @@ function bindEvents() {
   el.formLancamento?.addEventListener('submit', onSaveLancamento);
   el.formFixa?.addEventListener('submit', onSaveFixa);
   el.formCartao?.addEventListener('submit', onSaveCartao);
+
+  el.lancForma?.addEventListener('change', updatePagamentoFields);
+  el.lancParcelado?.addEventListener('change', updatePagamentoFields);
 }
 
 async function loadDashboard() {
@@ -107,30 +121,64 @@ async function loadDashboard() {
 }
 
 function populateFilters() {
-  fillSelect(el.filterCategory, [''].concat(state.categorias || []), 'Todas');
+  fillSelect(el.filterCategory, state.categorias || [], 'Todas');
 
   const formas = unique(
-    (state.lancamentos || [])
-      .map(l => l.forma_pagamento)
-      .filter(Boolean)
+    (state.lancamentos || []).map(l => l.forma_pagamento).filter(Boolean)
       .concat(['Pix', 'Débito', 'Crédito', 'Dinheiro', 'Transferência'])
   );
-  fillSelect(el.filterForma, [''].concat(formas), 'Todas');
+  fillSelect(el.filterForma, formas, 'Todas');
 
-  const contas = unique(
-    (state.lancamentos || []).map(l => l.conta_pagamento).filter(Boolean)
-      .concat((state.cartoes || []).map(c => c.nome_cartao))
-  );
-  fillSelect(el.filterConta, [''].concat(contas), 'Todos');
+  const contas = unique([
+    ...(state.contas || []).map(c => c.nome),
+    ...(state.cartoes || []).map(c => c.nome_cartao),
+    ...(state.lancamentos || []).map(l => l.conta_pagamento).filter(Boolean),
+  ]);
+  fillSelect(el.filterConta, contas, 'Todos');
 }
 
 function populateModals() {
   fillSelect(el.lancCategoria, state.categorias || [], 'Selecione');
   fillSelect(el.fixaCategoria, state.categorias || [], 'Selecione');
-  fillSelect(el.lancConta, (state.cartoes || []).map(c => c.nome_cartao), 'Selecione');
+
+  fillSelect(
+    el.lancConta,
+    (state.contas || []).filter(c => String(c.ativo).toLowerCase() === 'sim').map(c => c.nome),
+    'Selecione'
+  );
+
+  fillSelect(
+    el.lancCartao,
+    (state.cartoes || []).filter(c => String(c.ativo).toLowerCase() === 'sim').map(c => `${c.id_cartao}||${c.nome_cartao}`),
+    'Selecione',
+    true
+  );
 
   const lancData = document.getElementById('lancData');
   if (lancData) lancData.value = new Date().toISOString().slice(0, 10);
+
+  updatePagamentoFields();
+}
+
+function updatePagamentoFields() {
+  const forma = el.lancForma?.value || '';
+  const parcelado = el.lancParcelado?.value || 'nao';
+  const isCredito = forma === 'Crédito';
+
+  el.fieldConta?.classList.toggle('hidden', isCredito);
+  el.fieldCartao?.classList.toggle('hidden', !isCredito);
+  el.fieldParcelado?.classList.toggle('hidden', !isCredito);
+  el.fieldTotalParcelas?.classList.toggle('hidden', !isCredito || parcelado !== 'sim');
+
+  if (!isCredito) {
+    if (el.lancCartao) el.lancCartao.value = '';
+    if (el.lancParcelado) el.lancParcelado.value = 'nao';
+    if (el.lancTotalParcelas) el.lancTotalParcelas.value = 1;
+  }
+
+  if (isCredito && parcelado !== 'sim' && el.lancTotalParcelas) {
+    el.lancTotalParcelas.value = 1;
+  }
 }
 
 function renderAll() {
@@ -157,11 +205,13 @@ function renderChart() {
 
   if (chartCategorias) chartCategorias.destroy();
 
+  const maior = [...data].sort((a, b) => Number(b.valor || 0) - Number(a.valor || 0))[0];
+
   chartCategorias = new Chart(ctx, {
     type: 'doughnut',
     data: {
       labels: data.map(i => i.categoria),
-      datasets: [{ data: data.map(i => i.valor) }],
+      datasets: [{ data: data.map(i => Number(i.valor || 0)) }],
     },
     options: {
       maintainAspectRatio: false,
@@ -170,6 +220,13 @@ function renderChart() {
         legend: {
           position: 'bottom',
           labels: { color: '#dbe7ff' }
+        },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              return `${context.label}: ${money(context.raw)}`;
+            }
+          }
         }
       }
     },
@@ -188,6 +245,13 @@ function renderChart() {
       }
     }]
   });
+
+  const subtitle = document.querySelector('.panel-chart .panel-subtitle');
+  if (subtitle) {
+    subtitle.textContent = maior
+      ? `Maior gasto do mês: ${maior.categoria} (${money(maior.valor)})`
+      : 'Visão rápida do peso de cada categoria';
+  }
 }
 
 function renderProximaFatura() {
@@ -214,17 +278,29 @@ function renderLancamentos() {
     return;
   }
 
-  el.listaLancamentos.innerHTML = items.map(item => `
-    <div class="list-item">
-      <div class="list-item-title">${escapeHtml(item.descricao)}</div>
-      <div class="list-item-meta">
-        ${formatDateBR(item.data)} • ${escapeHtml(item.categoria)}${item.conta_pagamento ? ' • ' + escapeHtml(item.conta_pagamento) : ''}
+  el.listaLancamentos.innerHTML = items.map(item => {
+    const sinal = item.tipo === 'receita' ? '+' : '-';
+    const origem = item.forma_pagamento === 'Crédito'
+      ? (item.nome_cartao || item.conta_pagamento || '')
+      : (item.conta_pagamento || '');
+
+    const parcelaTxt = String(item.total_parcelas || '1') !== '1'
+      ? ` • ${item.parcela_atual || 1}/${item.total_parcelas}`
+      : '';
+
+    return `
+      <div class="list-item">
+        <div class="list-item-title">${escapeHtml(item.descricao)}</div>
+        <div class="list-item-meta">
+          ${formatDateBR(item.data)} • ${escapeHtml(item.categoria)} • ${escapeHtml(item.status || '')}
+        </div>
+        <div class="list-item-meta">
+          ${escapeHtml(item.forma_pagamento || '')}${origem ? ' • ' + escapeHtml(origem) : ''}${parcelaTxt}
+        </div>
+        <div class="list-item-title" style="margin-top:8px;">${sinal} ${money(item.valor)}</div>
       </div>
-      <div class="list-item-title" style="margin-top:8px;">
-        ${item.tipo === 'receita' ? '+' : '-'} ${money(item.valor)}
-      </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
 function renderFixas() {
@@ -245,11 +321,6 @@ function renderFixas() {
 }
 
 function renderCartoes() {
-  if (!(state.cartoes || []).length && !(state.faturas || []).length) {
-    el.listaCartoes.innerHTML = `<div class="empty-state">Nenhum cartão cadastrado.</div>`;
-    return;
-  }
-
   const cards = [];
 
   (state.cartoes || []).forEach(c => {
@@ -272,6 +343,11 @@ function renderCartoes() {
     `);
   });
 
+  if (!cards.length) {
+    el.listaCartoes.innerHTML = `<div class="empty-state">Nenhum cartão cadastrado.</div>`;
+    return;
+  }
+
   el.listaCartoes.innerHTML = cards.join('');
 }
 
@@ -280,7 +356,14 @@ function filteredLancamentos() {
     if (el.filterCategory.value && item.categoria !== el.filterCategory.value) return false;
     if (el.filterStatus.value && item.status !== el.filterStatus.value) return false;
     if (el.filterForma.value && item.forma_pagamento !== el.filterForma.value) return false;
-    if (el.filterConta.value && item.conta_pagamento !== el.filterConta.value) return false;
+
+    if (el.filterConta.value) {
+      const alvo = item.forma_pagamento === 'Crédito'
+        ? (item.nome_cartao || item.conta_pagamento || '')
+        : (item.conta_pagamento || '');
+      if (alvo !== el.filterConta.value) return false;
+    }
+
     return true;
   });
 }
@@ -289,7 +372,28 @@ async function onSaveLancamento(ev) {
   ev.preventDefault();
 
   const data = Object.fromEntries(new FormData(el.formLancamento).entries());
+
+  if (data.forma_pagamento === 'Crédito') {
+    if (!data.id_cartao) {
+      alert('Selecione um cartão.');
+      return;
+    }
+
+    const [idCartao, nomeCartao] = String(data.id_cartao).split('||');
+    data.id_cartao = idCartao || '';
+    data.conta_pagamento = nomeCartao || '';
+  } else {
+    data.id_cartao = '';
+    data.parcelado = 'nao';
+    data.total_parcelas = 1;
+  }
+
+  if (data.parcelado !== 'sim') {
+    data.total_parcelas = 1;
+  }
+
   await postAction('saveLancamento', data);
+  el.formLancamento.reset();
   closeModal('modalLancamento');
   await loadDashboard();
 }
@@ -299,6 +403,7 @@ async function onSaveFixa(ev) {
 
   const data = Object.fromEntries(new FormData(el.formFixa).entries());
   await postAction('saveFixa', data);
+  el.formFixa.reset();
   closeModal('modalFixa');
   await loadDashboard();
 }
@@ -308,6 +413,7 @@ async function onSaveCartao(ev) {
 
   const data = Object.fromEntries(new FormData(el.formCartao).entries());
   await postAction('saveCartao', data);
+  el.formCartao.reset();
   closeModal('modalCartao');
   await loadDashboard();
 }
@@ -327,7 +433,7 @@ async function postAction(action, data) {
   return json;
 }
 
-function fillSelect(select, values, placeholder) {
+function fillSelect(select, values, placeholder, cartaoComTexto = false) {
   if (!select) return;
 
   const current = select.value;
@@ -341,10 +447,19 @@ function fillSelect(select, values, placeholder) {
   }
 
   values.forEach(value => {
-    if (value === '') return;
+    if (!value) return;
+
     const opt = document.createElement('option');
-    opt.value = value;
-    opt.textContent = value;
+
+    if (cartaoComTexto) {
+      const [id, nome] = String(value).split('||');
+      opt.value = value;
+      opt.textContent = nome || id || value;
+    } else {
+      opt.value = value;
+      opt.textContent = value;
+    }
+
     select.appendChild(opt);
   });
 
@@ -355,6 +470,7 @@ function fillSelect(select, values, placeholder) {
 
 function openLancamentoModal() {
   openModal('modalLancamento');
+  updatePagamentoFields();
 }
 
 function openFixaModal() {
@@ -397,6 +513,7 @@ function money(value) {
 function formatDateBR(value) {
   if (!value) return '-';
   const [y, m, d] = String(value).split('-');
+  if (!y || !m || !d) return value;
   return `${d}/${m}/${y}`;
 }
 
