@@ -136,43 +136,52 @@
 
     <section class="stack-grid">
       <article class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>Lançamentos</h3>
-            <p class="panel-subtitle">Últimos registros do período</p>
-          </div>
-          <button class="btn btn-ghost" type="button" onclick="openLancamentoModal()">Novo</button>
-        </div>
-        <div id="listaLancamentos" class="list-container">
-          <div class="empty-state">Nenhum lançamento encontrado.</div>
-        </div>
-      </article>
+  <div class="panel-header">
+    <div>
+      <h3>Lançamentos</h3>
+      <p class="panel-subtitle" id="subtituloLancamentos">Últimos registros do período</p>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-ghost" type="button" onclick="toggleLista('lancamentos')">Ver mais</button>
+      <button class="btn btn-ghost" type="button" onclick="openLancamentoModal()">Novo</button>
+    </div>
+  </div>
+  <div id="listaLancamentos" class="list-container">
+    <div class="empty-state">Nenhum lançamento encontrado.</div>
+  </div>
+</article>
 
       <article class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>Despesas fixas previstas</h3>
-            <p class="panel-subtitle">Controle das recorrências do mês</p>
-          </div>
-          <button class="btn btn-ghost" type="button" onclick="openFixaModal()">Nova fixa</button>
-        </div>
-        <div id="listaFixas" class="list-container">
-          <div class="empty-state">Nenhuma fixa cadastrada.</div>
-        </div>
-      </article>
+  <div class="panel-header">
+    <div>
+      <h3>Despesas fixas previstas</h3>
+      <p class="panel-subtitle">Controle das recorrências do mês</p>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-ghost" type="button" onclick="toggleLista('fixas')">Ver mais</button>
+      <button class="btn btn-ghost" type="button" onclick="openFixaModal()">Nova fixa</button>
+    </div>
+  </div>
+  <div id="listaFixas" class="list-container">
+    <div class="empty-state">Nenhuma fixa cadastrada.</div>
+  </div>
+</article>
 
       <article class="panel">
-        <div class="panel-header">
-          <div>
-            <h3>Cartões e faturas</h3>
-            <p class="panel-subtitle">Cartões ativos e visão de fechamento</p>
-          </div>
-          <button class="btn btn-ghost" type="button" onclick="openCartaoModal()">Novo cartão</button>
-        </div>
-        <div id="listaCartoes" class="list-container">
-          <div class="empty-state">Nenhum cartão cadastrado.</div>
-        </div>
-      </article>
+  <div class="panel-header">
+    <div>
+      <h3>Cartões e faturas</h3>
+      <p class="panel-subtitle">Cartões ativos e visão de fechamento</p>
+    </div>
+    <div class="panel-actions">
+      <button class="btn btn-ghost" type="button" onclick="toggleLista('cartoes')">Ver mais</button>
+      <button class="btn btn-ghost" type="button" onclick="openCartaoModal()">Novo cartão</button>
+    </div>
+  </div>
+  <div id="listaCartoes" class="list-container">
+    <div class="empty-state">Nenhum cartão cadastrado.</div>
+  </div>
+</article>
     </section>
   </main>
 
