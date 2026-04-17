@@ -63,20 +63,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initFilters() {
   const now = new Date();
 
-  for (let m = 1; m <= 12; m++) {
-    const opt = document.createElement('option');
-    opt.value = String(m).padStart(2, '0');
-    opt.textContent = String(m).padStart(2, '0');
-    if (m === now.getMonth() + 1) opt.selected = true;
-    el.filterMonth.appendChild(opt);
+  if (el.filterMonth && !el.filterMonth.options.length) {
+    for (let m = 1; m <= 12; m++) {
+      const opt = document.createElement('option');
+      opt.value = String(m).padStart(2, '0');
+      opt.textContent = String(m).padStart(2, '0');
+      if (m === now.getMonth() + 1) opt.selected = true;
+      el.filterMonth.appendChild(opt);
+    }
   }
 
-  for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 2; y++) {
-    const opt = document.createElement('option');
-    opt.value = String(y);
-    opt.textContent = String(y);
-    if (y === now.getFullYear()) opt.selected = true;
-    el.filterYear.appendChild(opt);
+  if (el.filterYear && !el.filterYear.options.length) {
+    for (let y = now.getFullYear() - 2; y <= now.getFullYear() + 2; y++) {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      if (y === now.getFullYear()) opt.selected = true;
+      el.filterYear.appendChild(opt);
+    }
   }
 }
 
@@ -85,8 +89,13 @@ function bindEvents() {
     item?.addEventListener('change', loadDashboard);
   });
 
-  [el.filterCategory, el.filterStatus, el.filterForma, el.filterConta].forEach(item => {
+  [el.filterCategory, el.filterStatus, el.filterConta].forEach(item => {
     item?.addEventListener('change', renderAll);
+  });
+
+  el.filterForma?.addEventListener('change', () => {
+    updateFiltroContaOptions();
+    renderAll();
   });
 
   el.formLancamento?.addEventListener('submit', onSaveLancamento);
@@ -101,8 +110,8 @@ async function loadDashboard() {
   try {
     const params = new URLSearchParams({
       action: 'bootstrap',
-      month: el.filterMonth.value,
-      year: el.filterYear.value,
+      month: el.filterMonth?.value || String(new Date().getMonth() + 1).padStart(2, '0'),
+      year: el.filterYear?.value || String(new Date().getFullYear()),
     });
 
     const res = await fetch(`${API_URL}?${params.toString()}`);
@@ -110,7 +119,15 @@ async function loadDashboard() {
 
     if (!json.ok) throw new Error(json.error || 'Falha ao carregar');
 
-    state = json;
+    state = {
+      categorias: json.categorias || [],
+      cartoes: json.cartoes || [],
+      contas: json.contas || [],
+      lancamentos: json.lancamentos || [],
+      fixas: json.fixas || [],
+      faturas: json.faturas || [],
+      dashboard: json.dashboard || {},
+    };
 
     populateFilters();
     populateModals();
@@ -124,17 +141,38 @@ function populateFilters() {
   fillSelect(el.filterCategory, state.categorias || [], 'Todas');
 
   const formas = unique(
-    (state.lancamentos || []).map(l => l.forma_pagamento).filter(Boolean)
+    (state.lancamentos || [])
+      .map(l => l.forma_pagamento)
+      .filter(Boolean)
       .concat(['Pix', 'Débito', 'Crédito', 'Dinheiro', 'Transferência'])
   );
   fillSelect(el.filterForma, formas, 'Todas');
 
-  const contas = unique([
-    ...(state.contas || []).map(c => c.nome),
-    ...(state.cartoes || []).map(c => c.nome_cartao),
-    ...(state.lancamentos || []).map(l => l.conta_pagamento).filter(Boolean),
-  ]);
-  fillSelect(el.filterConta, contas, 'Todos');
+  updateFiltroContaOptions();
+}
+
+function updateFiltroContaOptions() {
+  const forma = el.filterForma?.value || '';
+  let options = [];
+
+  if (forma === 'Crédito') {
+    options = (state.cartoes || [])
+      .filter(c => String(c.ativo || '').toLowerCase() === 'sim')
+      .map(c => c.nome_cartao)
+      .filter(Boolean);
+  } else if (['Pix', 'Débito', 'Transferência', 'Dinheiro'].includes(forma)) {
+    options = (state.contas || [])
+      .filter(c => String(c.ativo || '').toLowerCase() === 'sim')
+      .map(c => c.nome)
+      .filter(Boolean);
+  } else {
+    options = unique([
+      ...(state.contas || []).map(c => c.nome).filter(Boolean),
+      ...(state.cartoes || []).map(c => c.nome_cartao).filter(Boolean),
+    ]);
+  }
+
+  fillSelect(el.filterConta, options, 'Todos');
 }
 
 function populateModals() {
@@ -143,19 +181,25 @@ function populateModals() {
 
   fillSelect(
     el.lancConta,
-    (state.contas || []).filter(c => String(c.ativo).toLowerCase() === 'sim').map(c => c.nome),
+    (state.contas || [])
+      .filter(c => String(c.ativo || '').toLowerCase() === 'sim')
+      .map(c => c.nome),
     'Selecione'
   );
 
   fillSelect(
     el.lancCartao,
-    (state.cartoes || []).filter(c => String(c.ativo).toLowerCase() === 'sim').map(c => `${c.id_cartao}||${c.nome_cartao}`),
+    (state.cartoes || [])
+      .filter(c => String(c.ativo || '').toLowerCase() === 'sim')
+      .map(c => `${c.id_cartao}||${c.nome_cartao}`),
     'Selecione',
     true
   );
 
   const lancData = document.getElementById('lancData');
-  if (lancData) lancData.value = new Date().toISOString().slice(0, 10);
+  if (lancData && !lancData.value) {
+    lancData.value = new Date().toISOString().slice(0, 10);
+  }
 
   updatePagamentoFields();
 }
@@ -192,10 +236,10 @@ function renderAll() {
 
 function renderCards() {
   const cards = state.dashboard?.cards || {};
-  el.saldoReal.textContent = money(cards.saldo_real || 0);
-  el.saldoProjetado.textContent = money(cards.saldo_projetado || 0);
-  el.receitasRecebidas.textContent = money(cards.receitas_recebidas || 0);
-  el.despesasPrevistas.textContent = money(cards.despesas_previstas || 0);
+  if (el.saldoReal) el.saldoReal.textContent = money(cards.saldo_real || 0);
+  if (el.saldoProjetado) el.saldoProjetado.textContent = money(cards.saldo_projetado || 0);
+  if (el.receitasRecebidas) el.receitasRecebidas.textContent = money(cards.receitas_recebidas || 0);
+  if (el.despesasPrevistas) el.despesasPrevistas.textContent = money(cards.despesas_previstas || 0);
 }
 
 function renderChart() {
@@ -211,7 +255,9 @@ function renderChart() {
     type: 'doughnut',
     data: {
       labels: data.map(i => i.categoria),
-      datasets: [{ data: data.map(i => Number(i.valor || 0)) }],
+      datasets: [{
+        data: data.map(i => Number(i.valor || 0)),
+      }],
     },
     options: {
       maintainAspectRatio: false,
@@ -256,6 +302,9 @@ function renderChart() {
 
 function renderProximaFatura() {
   const f = state.dashboard?.proxima_fatura;
+
+  if (!el.proximaFatura) return;
+
   if (!f) {
     el.proximaFatura.innerHTML = `<div class="empty-state">Nenhuma fatura disponível.</div>`;
     return;
@@ -264,7 +313,7 @@ function renderProximaFatura() {
   el.proximaFatura.innerHTML = `
     <div class="list-item">
       <div class="list-item-title">${escapeHtml(f.nome_cartao)}</div>
-      <div class="list-item-meta">Competência ${escapeHtml(f.competencia)} • vence em ${formatDateBR(f.data_vencimento)}</div>
+      <div class="list-item-meta">Competência ${escapeHtml(cleanCompetencia(f.competencia))} • vence em ${formatDateBR(f.data_vencimento)}</div>
       <div class="list-item-title" style="margin-top:8px;">${money(f.valor_total)}</div>
     </div>
   `;
@@ -272,6 +321,8 @@ function renderProximaFatura() {
 
 function renderLancamentos() {
   const items = filteredLancamentos();
+
+  if (!el.listaLancamentos) return;
 
   if (!items.length) {
     el.listaLancamentos.innerHTML = `<div class="empty-state">Nenhum lançamento encontrado.</div>`;
@@ -284,8 +335,8 @@ function renderLancamentos() {
       ? (item.nome_cartao || item.conta_pagamento || '')
       : (item.conta_pagamento || '');
 
-    const parcelaTxt = String(item.total_parcelas || '1') !== '1'
-      ? ` • ${item.parcela_atual || 1}/${item.total_parcelas}`
+    const parcelaInfo = String(item.total_parcelas || '1') !== '1'
+      ? `${item.parcela_atual || 1}/${item.total_parcelas}`
       : '';
 
     return `
@@ -295,7 +346,9 @@ function renderLancamentos() {
           ${formatDateBR(item.data)} • ${escapeHtml(item.categoria)} • ${escapeHtml(item.status || '')}
         </div>
         <div class="list-item-meta">
-          ${escapeHtml(item.forma_pagamento || '')}${origem ? ' • ' + escapeHtml(origem) : ''}${parcelaTxt}
+          Forma: ${escapeHtml(item.forma_pagamento || '-')}
+          ${origem ? ` • Origem: ${escapeHtml(origem)}` : ''}
+          ${parcelaInfo ? ` • Parcela: ${escapeHtml(parcelaInfo)}` : ''}
         </div>
         <div class="list-item-title" style="margin-top:8px;">${sinal} ${money(item.valor)}</div>
       </div>
@@ -305,6 +358,8 @@ function renderLancamentos() {
 
 function renderFixas() {
   const items = (state.fixas || []).filter(f => String(f.ativo || '').toLowerCase() === 'sim');
+
+  if (!el.listaFixas) return;
 
   if (!items.length) {
     el.listaFixas.innerHTML = `<div class="empty-state">Nenhuma fixa cadastrada.</div>`;
@@ -321,6 +376,8 @@ function renderFixas() {
 }
 
 function renderCartoes() {
+  if (!el.listaCartoes) return;
+
   const cards = [];
 
   (state.cartoes || []).forEach(c => {
@@ -337,7 +394,7 @@ function renderCartoes() {
     cards.push(`
       <div class="list-item">
         <div class="list-item-title">Fatura ${escapeHtml(f.nome_cartao)}</div>
-        <div class="list-item-meta">${escapeHtml(f.competencia)} • vencimento ${formatDateBR(f.data_vencimento)}</div>
+        <div class="list-item-meta">${escapeHtml(cleanCompetencia(f.competencia))} • vencimento ${formatDateBR(f.data_vencimento)}</div>
         <div class="list-item-title" style="margin-top:8px;">${money(f.valor_total)}</div>
       </div>
     `);
@@ -353,14 +410,15 @@ function renderCartoes() {
 
 function filteredLancamentos() {
   return (state.lancamentos || []).filter(item => {
-    if (el.filterCategory.value && item.categoria !== el.filterCategory.value) return false;
-    if (el.filterStatus.value && item.status !== el.filterStatus.value) return false;
-    if (el.filterForma.value && item.forma_pagamento !== el.filterForma.value) return false;
+    if (el.filterCategory?.value && item.categoria !== el.filterCategory.value) return false;
+    if (el.filterStatus?.value && item.status !== el.filterStatus.value) return false;
+    if (el.filterForma?.value && item.forma_pagamento !== el.filterForma.value) return false;
 
-    if (el.filterConta.value) {
+    if (el.filterConta?.value) {
       const alvo = item.forma_pagamento === 'Crédito'
         ? (item.nome_cartao || item.conta_pagamento || '')
         : (item.conta_pagamento || '');
+
       if (alvo !== el.filterConta.value) return false;
     }
 
@@ -512,9 +570,37 @@ function money(value) {
 
 function formatDateBR(value) {
   if (!value) return '-';
-  const [y, m, d] = String(value).split('-');
-  if (!y || !m || !d) return value;
-  return `${d}/${m}/${y}`;
+
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(value);
+  }
+
+  const raw = String(value).trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    const [y, m, d] = raw.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
+  if (/^\d{4}-\d{2}$/.test(raw)) {
+    const [y, m] = raw.split('-');
+    return `${m}/${y}`;
+  }
+
+  const date = new Date(raw);
+  if (!isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
+  }
+
+  return raw;
+}
+
+function cleanCompetencia(value) {
+  if (!value) return '-';
+  const raw = String(value).trim();
+  const match = raw.match(/^(\d{4})-(\d{2})/);
+  if (match) return `${match[1]}-${match[2]}`;
+  return raw;
 }
 
 function unique(arr) {
