@@ -536,7 +536,31 @@ button {
     right: 18px;
     bottom: 86px;
   }
+.panel-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
 
+.list-item.highlighted-filter {
+  border: 1px solid rgba(59, 130, 246, 0.55);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.12) inset;
+  background: linear-gradient(180deg, rgba(26, 55, 92, 0.96), rgba(14, 30, 52, 0.98));
+}
+
+.list-item.compact .list-item-meta:last-of-type {
+  opacity: 0.92;
+}
+
+@media (max-width: 760px) {
+  .panel-actions {
+    width: 100%;
+  }
+
+  .panel-actions .btn {
+    flex: 1;
+  }
+}
   .bottom-nav {
     height: 70px;
   }
