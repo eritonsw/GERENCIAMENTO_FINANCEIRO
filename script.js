@@ -38,7 +38,14 @@ const el = {
   formFixa: $('#formFixa'),
   formCartao: $('#formCartao'),
 
+  tituloModalLancamento: $('#tituloModalLancamento'),
+  lancId: $('#lancId'),
+  lancData: $('#lancData'),
+  lancTipo: $('#lancTipo'),
   lancCategoria: $('#lancCategoria'),
+  lancDescricao: $('#lancDescricao'),
+  lancValor: $('#lancValor'),
+  lancStatus: $('#lancStatus'),
   lancForma: $('#lancForma'),
   lancConta: $('#lancConta'),
   lancCartao: $('#lancCartao'),
@@ -85,13 +92,8 @@ function initFilters() {
 }
 
 function bindEvents() {
-  [el.filterMonth, el.filterYear].forEach(item => {
-    item?.addEventListener('change', loadDashboard);
-  });
-
-  [el.filterCategory, el.filterStatus, el.filterConta].forEach(item => {
-    item?.addEventListener('change', renderAll);
-  });
+  [el.filterMonth, el.filterYear].forEach(item => item?.addEventListener('change', loadDashboard));
+  [el.filterCategory, el.filterStatus, el.filterConta].forEach(item => item?.addEventListener('change', renderAll));
 
   el.filterForma?.addEventListener('change', () => {
     updateFiltroContaOptions();
@@ -116,7 +118,6 @@ async function loadDashboard() {
 
     const res = await fetch(`${API_URL}?${params.toString()}`);
     const json = await res.json();
-
     if (!json.ok) throw new Error(json.error || 'Falha ao carregar');
 
     state = {
@@ -181,24 +182,19 @@ function populateModals() {
 
   fillSelect(
     el.lancConta,
-    (state.contas || [])
-      .filter(c => String(c.ativo || '').toLowerCase() === 'sim')
-      .map(c => c.nome),
+    (state.contas || []).filter(c => String(c.ativo || '').toLowerCase() === 'sim').map(c => c.nome),
     'Selecione'
   );
 
   fillSelect(
     el.lancCartao,
-    (state.cartoes || [])
-      .filter(c => String(c.ativo || '').toLowerCase() === 'sim')
-      .map(c => `${c.id_cartao}||${c.nome_cartao}`),
+    (state.cartoes || []).filter(c => String(c.ativo || '').toLowerCase() === 'sim').map(c => `${c.id_cartao}||${c.nome_cartao}`),
     'Selecione',
     true
   );
 
-  const lancData = document.getElementById('lancData');
-  if (lancData && !lancData.value) {
-    lancData.value = new Date().toISOString().slice(0, 10);
+  if (el.lancData && !el.lancData.value) {
+    el.lancData.value = new Date().toISOString().slice(0, 10);
   }
 
   updatePagamentoFields();
@@ -208,19 +204,20 @@ function updatePagamentoFields() {
   const forma = el.lancForma?.value || '';
   const parcelado = el.lancParcelado?.value || 'nao';
   const isCredito = forma === 'Crédito';
+  const editing = Boolean(el.lancId?.value);
 
   el.fieldConta?.classList.toggle('hidden', isCredito);
   el.fieldCartao?.classList.toggle('hidden', !isCredito);
-  el.fieldParcelado?.classList.toggle('hidden', !isCredito);
-  el.fieldTotalParcelas?.classList.toggle('hidden', !isCredito || parcelado !== 'sim');
+  el.fieldParcelado?.classList.toggle('hidden', !isCredito || editing);
+  el.fieldTotalParcelas?.classList.toggle('hidden', !isCredito || parcelado !== 'sim' || editing);
 
   if (!isCredito) {
     if (el.lancCartao) el.lancCartao.value = '';
-    if (el.lancParcelado) el.lancParcelado.value = 'nao';
-    if (el.lancTotalParcelas) el.lancTotalParcelas.value = 1;
+    if (el.lancParcelado && !editing) el.lancParcelado.value = 'nao';
+    if (el.lancTotalParcelas && !editing) el.lancTotalParcelas.value = 1;
   }
 
-  if (isCredito && parcelado !== 'sim' && el.lancTotalParcelas) {
+  if (isCredito && parcelado !== 'sim' && el.lancTotalParcelas && !editing) {
     el.lancTotalParcelas.value = 1;
   }
 }
@@ -246,7 +243,6 @@ function renderChart() {
   const data = state.dashboard?.grafico_categorias || [];
   const ctx = document.getElementById('graficoCategorias');
   if (!ctx) return;
-
   if (chartCategorias) chartCategorias.destroy();
 
   const maior = [...data].sort((a, b) => Number(b.valor || 0) - Number(a.valor || 0))[0];
@@ -255,18 +251,13 @@ function renderChart() {
     type: 'doughnut',
     data: {
       labels: data.map(i => i.categoria),
-      datasets: [{
-        data: data.map(i => Number(i.valor || 0)),
-      }],
+      datasets: [{ data: data.map(i => Number(i.valor || 0)) }]
     },
     options: {
       maintainAspectRatio: false,
       cutout: '62%',
       plugins: {
-        legend: {
-          position: 'bottom',
-          labels: { color: '#dbe7ff' }
-        },
+        legend: { position: 'bottom', labels: { color: '#dbe7ff' } },
         tooltip: {
           callbacks: {
             label(context) {
@@ -302,7 +293,6 @@ function renderChart() {
 
 function renderProximaFatura() {
   const f = state.dashboard?.proxima_fatura;
-
   if (!el.proximaFatura) return;
 
   if (!f) {
@@ -321,7 +311,6 @@ function renderProximaFatura() {
 
 function renderLancamentos() {
   const items = filteredLancamentos();
-
   if (!el.listaLancamentos) return;
 
   if (!items.length) {
@@ -334,23 +323,26 @@ function renderLancamentos() {
     const origem = item.forma_pagamento === 'Crédito'
       ? (item.nome_cartao || item.conta_pagamento || '')
       : (item.conta_pagamento || '');
-
-    const parcelaInfo = String(item.total_parcelas || '1') !== '1'
-      ? `${item.parcela_atual || 1}/${item.total_parcelas}`
+    const parcelaInfo = String(item.total_parcelas || '1') !== '1' ? `${item.parcela_atual || 1}/${item.total_parcelas}` : '';
+    const editBtn = item.id_lancamento
+      ? `<button class="btn btn-ghost" type="button" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
       : '';
 
     return `
       <div class="list-item">
-        <div class="list-item-title">${escapeHtml(item.descricao)}</div>
-        <div class="list-item-meta">
-          ${formatDateBR(item.data)} • ${escapeHtml(item.categoria)} • ${escapeHtml(item.status || '')}
+        <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+          <div style="flex:1;">
+            <div class="list-item-title">${escapeHtml(item.descricao)}</div>
+            <div class="list-item-meta">${formatDateBR(item.data)} • ${escapeHtml(item.categoria)} • ${escapeHtml(item.status || '')}</div>
+            <div class="list-item-meta">
+              Forma: ${escapeHtml(item.forma_pagamento || '-')}
+              ${origem ? ` • Origem: ${escapeHtml(origem)}` : ''}
+              ${parcelaInfo ? ` • Parcela: ${escapeHtml(parcelaInfo)}` : ''}
+            </div>
+            <div class="list-item-title" style="margin-top:8px;">${sinal} ${money(item.valor)}</div>
+          </div>
+          <div>${editBtn}</div>
         </div>
-        <div class="list-item-meta">
-          Forma: ${escapeHtml(item.forma_pagamento || '-')}
-          ${origem ? ` • Origem: ${escapeHtml(origem)}` : ''}
-          ${parcelaInfo ? ` • Parcela: ${escapeHtml(parcelaInfo)}` : ''}
-        </div>
-        <div class="list-item-title" style="margin-top:8px;">${sinal} ${money(item.valor)}</div>
       </div>
     `;
   }).join('');
@@ -358,7 +350,6 @@ function renderLancamentos() {
 
 function renderFixas() {
   const items = (state.fixas || []).filter(f => String(f.ativo || '').toLowerCase() === 'sim');
-
   if (!el.listaFixas) return;
 
   if (!items.length) {
@@ -377,7 +368,6 @@ function renderFixas() {
 
 function renderCartoes() {
   if (!el.listaCartoes) return;
-
   const cards = [];
 
   (state.cartoes || []).forEach(c => {
@@ -418,25 +408,22 @@ function filteredLancamentos() {
       const alvo = item.forma_pagamento === 'Crédito'
         ? (item.nome_cartao || item.conta_pagamento || '')
         : (item.conta_pagamento || '');
-
       if (alvo !== el.filterConta.value) return false;
     }
-
     return true;
   });
 }
 
 async function onSaveLancamento(ev) {
   ev.preventDefault();
-
   const data = Object.fromEntries(new FormData(el.formLancamento).entries());
+  const editing = Boolean(data.id_lancamento);
 
   if (data.forma_pagamento === 'Crédito') {
     if (!data.id_cartao) {
       alert('Selecione um cartão.');
       return;
     }
-
     const [idCartao, nomeCartao] = String(data.id_cartao).split('||');
     data.id_cartao = idCartao || '';
     data.conta_pagamento = nomeCartao || '';
@@ -446,19 +433,18 @@ async function onSaveLancamento(ev) {
     data.total_parcelas = 1;
   }
 
-  if (data.parcelado !== 'sim') {
-    data.total_parcelas = 1;
-  }
+  if (data.parcelado !== 'sim') data.total_parcelas = 1;
 
-  await postAction('saveLancamento', data);
-  el.formLancamento.reset();
+  const action = editing ? 'updateLancamento' : 'saveLancamento';
+  await postAction(action, data);
+
+  resetLancamentoForm();
   closeModal('modalLancamento');
   await loadDashboard();
 }
 
 async function onSaveFixa(ev) {
   ev.preventDefault();
-
   const data = Object.fromEntries(new FormData(el.formFixa).entries());
   await postAction('saveFixa', data);
   el.formFixa.reset();
@@ -468,7 +454,6 @@ async function onSaveFixa(ev) {
 
 async function onSaveCartao(ev) {
   ev.preventDefault();
-
   const data = Object.fromEntries(new FormData(el.formCartao).entries());
   await postAction('saveCartao', data);
   el.formCartao.reset();
@@ -476,16 +461,57 @@ async function onSaveCartao(ev) {
   await loadDashboard();
 }
 
+function editLancamento(id) {
+  const item = (state.lancamentos || []).find(l => String(l.id_lancamento) === String(id));
+  if (!item) {
+    alert('Lançamento não encontrado.');
+    return;
+  }
+
+  resetLancamentoForm();
+
+  if (el.tituloModalLancamento) el.tituloModalLancamento.textContent = 'Editar lançamento';
+  if (el.lancId) el.lancId.value = item.id_lancamento || '';
+  if (el.lancData) el.lancData.value = normalizeDateForInput(item.data);
+  if (el.lancTipo) el.lancTipo.value = item.tipo || 'despesa';
+  if (el.lancCategoria) el.lancCategoria.value = item.categoria || '';
+  if (el.lancDescricao) el.lancDescricao.value = item.descricao || '';
+  if (el.lancValor) el.lancValor.value = normalizeNumberForInput(item.valor);
+  if (el.lancStatus) el.lancStatus.value = item.status || 'pendente';
+  if (el.lancForma) el.lancForma.value = item.forma_pagamento || '';
+
+  if (item.forma_pagamento === 'Crédito') {
+    const option = [...(el.lancCartao?.options || [])].find(o => {
+      const [idCartao, nome] = String(o.value).split('||');
+      return idCartao === String(item.id_cartao || '') || nome === String(item.conta_pagamento || '');
+    });
+    if (option && el.lancCartao) el.lancCartao.value = option.value;
+    if (el.lancParcelado) el.lancParcelado.value = String(item.total_parcelas || '1') !== '1' ? 'sim' : 'nao';
+    if (el.lancTotalParcelas) el.lancTotalParcelas.value = item.total_parcelas || 1;
+  } else {
+    if (el.lancConta) el.lancConta.value = item.conta_pagamento || '';
+  }
+
+  updatePagamentoFields();
+  openModal('modalLancamento');
+}
+
+function resetLancamentoForm() {
+  el.formLancamento?.reset();
+  if (el.tituloModalLancamento) el.tituloModalLancamento.textContent = 'Novo lançamento';
+  if (el.lancId) el.lancId.value = '';
+  if (el.lancData) el.lancData.value = new Date().toISOString().slice(0, 10);
+  if (el.lancParcelado) el.lancParcelado.value = 'nao';
+  if (el.lancTotalParcelas) el.lancTotalParcelas.value = 1;
+  updatePagamentoFields();
+}
+
 async function postAction(action, data) {
   const payload = { action, data };
   const body = new URLSearchParams();
   body.append('payload', JSON.stringify(payload));
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    body
-  });
-
+  const res = await fetch(API_URL, { method: 'POST', body });
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'Falha ao salvar');
   return json;
@@ -493,7 +519,6 @@ async function postAction(action, data) {
 
 function fillSelect(select, values, placeholder, cartaoComTexto = false) {
   if (!select) return;
-
   const current = select.value;
   select.innerHTML = '';
 
@@ -506,9 +531,7 @@ function fillSelect(select, values, placeholder, cartaoComTexto = false) {
 
   values.forEach(value => {
     if (!value) return;
-
     const opt = document.createElement('option');
-
     if (cartaoComTexto) {
       const [id, nome] = String(value).split('||');
       opt.value = value;
@@ -517,7 +540,6 @@ function fillSelect(select, values, placeholder, cartaoComTexto = false) {
       opt.value = value;
       opt.textContent = value;
     }
-
     select.appendChild(opt);
   });
 
@@ -527,17 +549,12 @@ function fillSelect(select, values, placeholder, cartaoComTexto = false) {
 }
 
 function openLancamentoModal() {
+  resetLancamentoForm();
   openModal('modalLancamento');
-  updatePagamentoFields();
 }
 
-function openFixaModal() {
-  openModal('modalFixa');
-}
-
-function openCartaoModal() {
-  openModal('modalCartao');
-}
+function openFixaModal() { openModal('modalFixa'); }
+function openCartaoModal() { openModal('modalCartao'); }
 
 function openModal(id) {
   const modal = document.getElementById(id);
@@ -554,6 +571,7 @@ window.openFixaModal = openFixaModal;
 window.openCartaoModal = openCartaoModal;
 window.closeModal = closeModal;
 window.loadDashboard = loadDashboard;
+window.editLancamento = editLancamento;
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -562,36 +580,27 @@ function registerServiceWorker() {
 }
 
 function money(value) {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  }).format(Number(value || 0));
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0));
 }
 
 function formatDateBR(value) {
   if (!value) return '-';
-
   if (value instanceof Date && !isNaN(value.getTime())) {
     return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(value);
   }
-
   const raw = String(value).trim();
-
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     const [y, m, d] = raw.split('-');
     return `${d}/${m}/${y}`;
   }
-
   if (/^\d{4}-\d{2}$/.test(raw)) {
     const [y, m] = raw.split('-');
     return `${m}/${y}`;
   }
-
   const date = new Date(raw);
   if (!isNaN(date.getTime())) {
     return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
   }
-
   return raw;
 }
 
@@ -603,6 +612,22 @@ function cleanCompetencia(value) {
   return raw;
 }
 
+function normalizeDateForInput(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const date = new Date(raw);
+  if (!isNaN(date.getTime())) {
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  }
+  return '';
+}
+
+function normalizeNumberForInput(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? String(n) : '';
+}
+
 function unique(arr) {
   return [...new Set(arr.filter(Boolean))];
 }
@@ -612,6 +637,10 @@ function escapeHtml(str) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+    .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function escapeJs(str) {
+  return String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
