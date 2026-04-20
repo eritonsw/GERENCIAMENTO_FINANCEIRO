@@ -340,6 +340,11 @@ button {
   color: white;
 }
 
+.btn-danger {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  color: white;
+}
+
 .fab-inline {
   min-width: 180px;
 }
