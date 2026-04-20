@@ -309,6 +309,7 @@ function renderProximaFatura() {
   `;
 }
 
+// ── ATUALIZADO: botões Editar + Excluir ──────────────────────────────────────
 function renderLancamentos() {
   const items = filteredLancamentos();
   if (!el.listaLancamentos) return;
@@ -323,15 +324,17 @@ function renderLancamentos() {
     const origem = item.forma_pagamento === 'Crédito'
       ? (item.nome_cartao || item.conta_pagamento || '')
       : (item.conta_pagamento || '');
-    const parcelaInfo = String(item.total_parcelas || '1') !== '1' ? `${item.parcela_atual || 1}/${item.total_parcelas}` : '';
-    
-const editBtn = item.id_lancamento
-  ? `<button class="btn btn-ghost" type="button" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
-  : '';
+    const parcelaInfo = String(item.total_parcelas || '1') !== '1'
+      ? `${item.parcela_atual || 1}/${item.total_parcelas}`
+      : '';
 
-const deleteBtn = item.id_lancamento
-  ? `<button class="btn btn-danger" type="button" onclick="deleteLancamento('${escapeJs(item.id_lancamento)}')">Excluir</button>`
-  : '';
+    const editBtn = item.id_lancamento
+      ? `<button class="btn btn-ghost" type="button" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
+      : '';
+
+    const deleteBtn = item.id_lancamento
+      ? `<button class="btn btn-danger" type="button" style="height:36px;padding:0 12px;font-size:0.85rem;" onclick="deleteLancamento('${escapeJs(item.id_lancamento)}')">Excluir</button>`
+      : '';
 
     return `
       <div class="list-item">
@@ -346,13 +349,17 @@ const deleteBtn = item.id_lancamento
             </div>
             <div class="list-item-title" style="margin-top:8px;">${sinal} ${money(item.valor)}</div>
           </div>
-          <div>${editBtn}</div>
+          <div style="display:flex; flex-direction:column; gap:6px; align-items:flex-end;">
+            ${editBtn}
+            ${deleteBtn}
+          </div>
         </div>
       </div>
     `;
   }).join('');
 }
 
+// ── ATUALIZADO: botão Excluir nas fixas ─────────────────────────────────────
 function renderFixas() {
   const items = (state.fixas || []).filter(f => String(f.ativo || '').toLowerCase() === 'sim');
   if (!el.listaFixas) return;
@@ -364,13 +371,21 @@ function renderFixas() {
 
   el.listaFixas.innerHTML = items.map(item => `
     <div class="list-item">
-      <div class="list-item-title">${escapeHtml(item.descricao)}</div>
-      <div class="list-item-meta">${escapeHtml(item.categoria)} • vence dia ${escapeHtml(item.dia_vencimento)}</div>
-      <div class="list-item-title" style="margin-top:8px;">${money(item.valor_padrao)}</div>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+        <div style="flex:1;">
+          <div class="list-item-title">${escapeHtml(item.descricao)}</div>
+          <div class="list-item-meta">${escapeHtml(item.categoria)} • vence dia ${escapeHtml(String(item.dia_vencimento))}</div>
+          <div class="list-item-title" style="margin-top:8px;">${money(item.valor_padrao)}</div>
+        </div>
+        <div>
+          <button class="btn btn-danger" type="button" style="height:36px;padding:0 12px;font-size:0.85rem;" onclick="deleteFixa('${escapeJs(String(item.id_fixa))}')">Excluir</button>
+        </div>
+      </div>
     </div>
   `).join('');
 }
 
+// ── ATUALIZADO: botão Excluir nos cartões ───────────────────────────────────
 function renderCartoes() {
   if (!el.listaCartoes) return;
   const cards = [];
@@ -378,9 +393,16 @@ function renderCartoes() {
   (state.cartoes || []).forEach(c => {
     cards.push(`
       <div class="list-item">
-        <div class="list-item-title">${escapeHtml(c.nome_cartao)}</div>
-        <div class="list-item-meta">Fecha dia ${escapeHtml(c.dia_fechamento)} • vence dia ${escapeHtml(c.dia_vencimento)}</div>
-        <div class="list-item-meta">Limite ${money(c.limite || 0)}</div>
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+          <div style="flex:1;">
+            <div class="list-item-title">${escapeHtml(c.nome_cartao)}</div>
+            <div class="list-item-meta">Fecha dia ${escapeHtml(String(c.dia_fechamento))} • vence dia ${escapeHtml(String(c.dia_vencimento))}</div>
+            <div class="list-item-meta">Limite ${money(c.limite || 0)}</div>
+          </div>
+          <div>
+            <button class="btn btn-danger" type="button" style="height:36px;padding:0 12px;font-size:0.85rem;" onclick="deleteCartao('${escapeJs(String(c.id_cartao))}')">Excluir</button>
+          </div>
+        </div>
       </div>
     `);
   });
@@ -522,6 +544,40 @@ async function postAction(action, data) {
   return json;
 }
 
+// ── NOVAS FUNÇÕES DE EXCLUSÃO ────────────────────────────────────────────────
+
+async function deleteLancamento(id) {
+  if (!confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
+  try {
+    await postAction('deleteLancamento', { id_lancamento: id });
+    await loadDashboard();
+  } catch (err) {
+    alert('Erro ao excluir lançamento: ' + err.message);
+  }
+}
+
+async function deleteFixa(id) {
+  if (!confirm('Excluir esta despesa fixa? Esta ação não pode ser desfeita.')) return;
+  try {
+    await postAction('deleteFixa', { id_fixa: id });
+    await loadDashboard();
+  } catch (err) {
+    alert('Erro ao excluir despesa fixa: ' + err.message);
+  }
+}
+
+async function deleteCartao(id) {
+  if (!confirm('Excluir este cartão? Faturas vinculadas podem ser afetadas.')) return;
+  try {
+    await postAction('deleteCartao', { id_cartao: id });
+    await loadDashboard();
+  } catch (err) {
+    alert('Erro ao excluir cartão: ' + err.message);
+  }
+}
+
+// ── UTILITÁRIOS ──────────────────────────────────────────────────────────────
+
 function fillSelect(select, values, placeholder, cartaoComTexto = false) {
   if (!select) return;
   const current = select.value;
@@ -571,12 +627,16 @@ function closeModal(id) {
   if (modal) modal.style.display = 'none';
 }
 
+// ── EXPOR GLOBALMENTE ────────────────────────────────────────────────────────
 window.openLancamentoModal = openLancamentoModal;
 window.openFixaModal = openFixaModal;
 window.openCartaoModal = openCartaoModal;
 window.closeModal = closeModal;
 window.loadDashboard = loadDashboard;
 window.editLancamento = editLancamento;
+window.deleteLancamento = deleteLancamento;
+window.deleteFixa = deleteFixa;
+window.deleteCartao = deleteCartao;
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -594,11 +654,19 @@ function formatDateBR(value) {
     return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(value);
   }
   const raw = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+  if (/
+^
+\d{4}-\d{2}-\d{2}
+$
+/.test(raw)) {
     const [y, m, d] = raw.split('-');
     return `${d}/${m}/${y}`;
   }
-  if (/^\d{4}-\d{2}$/.test(raw)) {
+  if (/
+^
+\d{4}-\d{2}
+$
+/.test(raw)) {
     const [y, m] = raw.split('-');
     return `${m}/${y}`;
   }
@@ -612,7 +680,9 @@ function formatDateBR(value) {
 function cleanCompetencia(value) {
   if (!value) return '-';
   const raw = String(value).trim();
-  const match = raw.match(/^(\d{4})-(\d{2})/);
+  const match = raw.match(/
+^
+(\d{4})-(\d{2})/);
   if (match) return `${match[1]}-${match[2]}`;
   return raw;
 }
@@ -620,7 +690,11 @@ function cleanCompetencia(value) {
 function normalizeDateForInput(value) {
   if (!value) return '';
   const raw = String(value).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  if (/
+^
+\d{4}-\d{2}-\d{2}
+$
+/.test(raw)) return raw;
   const date = new Date(raw);
   if (!isNaN(date.getTime())) {
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -639,9 +713,9 @@ function unique(arr) {
 
 function escapeHtml(str) {
   return String(str || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+    .replace(/&/g, '&')
+    .replace(/</g, '<')
+    .replace(/>/g, '>')
     .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
