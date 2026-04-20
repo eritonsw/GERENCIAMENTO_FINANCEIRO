@@ -426,10 +426,11 @@ button {
 }
 
 @media (max-width: 760px) {
-  .modal {
-    align-items: flex-start;
-    padding: 10px;
+  .field input,
+  .field select {
+    height: 42px;
   }
+}
 
   .modal-content {
     width: 100%;
