@@ -712,19 +712,11 @@ function formatDateBR(value) {
     return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(value);
   }
   const raw = String(value).trim();
-  if (/
-^
-\d{4}-\d{2}-\d{2}
-$
-/.test(raw)) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
     const [y, m, d] = raw.split('-');
     return `${d}/${m}/${y}`;
   }
-  if (/
-^
-\d{4}-\d{2}
-$
-/.test(raw)) {
+  if (/^\d{4}-\d{2}$/.test(raw)) {
     const [y, m] = raw.split('-');
     return `${m}/${y}`;
   }
@@ -738,9 +730,7 @@ $
 function cleanCompetencia(value) {
   if (!value) return '-';
   const raw = String(value).trim();
-  const match = raw.match(/
-^
-(\d{4})-(\d{2})/);
+  const match = raw.match(/^(\d{4})-(\d{2})/);
   if (match) return `${match[1]}-${match[2]}`;
   return raw;
 }
@@ -748,11 +738,7 @@ function cleanCompetencia(value) {
 function normalizeDateForInput(value) {
   if (!value) return '';
   const raw = String(value).trim();
-  if (/
-^
-\d{4}-\d{2}-\d{2}
-$
-/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const date = new Date(raw);
   if (!isNaN(date.getTime())) {
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -771,9 +757,9 @@ function unique(arr) {
 
 function escapeHtml(str) {
   return String(str || '')
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
     .replace(/\"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
