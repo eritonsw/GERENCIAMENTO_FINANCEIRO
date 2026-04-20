@@ -324,9 +324,14 @@ function renderLancamentos() {
       ? (item.nome_cartao || item.conta_pagamento || '')
       : (item.conta_pagamento || '');
     const parcelaInfo = String(item.total_parcelas || '1') !== '1' ? `${item.parcela_atual || 1}/${item.total_parcelas}` : '';
-    const editBtn = item.id_lancamento
-      ? `<button class="btn btn-ghost" type="button" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
-      : '';
+    
+const editBtn = item.id_lancamento
+  ? `<button class="btn btn-ghost" type="button" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
+  : '';
+
+const deleteBtn = item.id_lancamento
+  ? `<button class="btn btn-danger" type="button" onclick="deleteLancamento('${escapeJs(item.id_lancamento)}')">Excluir</button>`
+  : '';
 
     return `
       <div class="list-item">
