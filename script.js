@@ -60,6 +60,19 @@ const el = {
   fixaCategoria: $('#fixaCategoria'),
 };
 
+// Controla quantos itens são exibidos por seção
+const ITEMS_VISIVEIS = {
+  lancamentos: 5,
+  fixas: 5,
+  cartoes: 5,
+};
+
+const expanded = {
+  lancamentos: false,
+  fixas: false,
+  cartoes: false,
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   initFilters();
   bindEvents();
@@ -129,6 +142,11 @@ async function loadDashboard() {
       faturas: json.faturas || [],
       dashboard: json.dashboard || {},
     };
+
+    // Reset expand ao recarregar
+    expanded.lancamentos = false;
+    expanded.fixas = false;
+    expanded.cartoes = false;
 
     populateFilters();
     populateModals();
@@ -309,15 +327,18 @@ function renderProximaFatura() {
   `;
 }
 
-// ── ATUALIZADO: botões Editar + Excluir ──────────────────────────────────────
 function renderLancamentos() {
-  const items = filteredLancamentos();
+  const todos = filteredLancamentos();
   if (!el.listaLancamentos) return;
 
-  if (!items.length) {
+  if (!todos.length) {
     el.listaLancamentos.innerHTML = `<div class="empty-state">Nenhum lançamento encontrado.</div>`;
+    atualizarBotaoVerMais('btnVerMaisLancamentos', 0, 0, 'lancamentos');
     return;
   }
+
+  const limite = expanded.lancamentos ? todos.length : ITEMS_VISIVEIS.lancamentos;
+  const items = todos.slice(0, limite);
 
   el.listaLancamentos.innerHTML = items.map(item => {
     const sinal = item.tipo === 'receita' ? '+' : '-';
@@ -329,7 +350,7 @@ function renderLancamentos() {
       : '';
 
     const editBtn = item.id_lancamento
-      ? `<button class="btn btn-ghost" type="button" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
+      ? `<button class="btn btn-ghost" type="button" style="height:36px;padding:0 12px;font-size:0.85rem;" onclick="editLancamento('${escapeJs(item.id_lancamento)}')">Editar</button>`
       : '';
 
     const deleteBtn = item.id_lancamento
@@ -357,17 +378,22 @@ function renderLancamentos() {
       </div>
     `;
   }).join('');
+
+  atualizarBotaoVerMais('btnVerMaisLancamentos', todos.length, limite, 'lancamentos');
 }
 
-// ── ATUALIZADO: botão Excluir nas fixas ─────────────────────────────────────
 function renderFixas() {
-  const items = (state.fixas || []).filter(f => String(f.ativo || '').toLowerCase() === 'sim');
+  const todos = (state.fixas || []).filter(f => String(f.ativo || '').toLowerCase() === 'sim');
   if (!el.listaFixas) return;
 
-  if (!items.length) {
+  if (!todos.length) {
     el.listaFixas.innerHTML = `<div class="empty-state">Nenhuma fixa cadastrada.</div>`;
+    atualizarBotaoVerMais('btnVerMaisFixas', 0, 0, 'fixas');
     return;
   }
+
+  const limite = expanded.fixas ? todos.length : ITEMS_VISIVEIS.fixas;
+  const items = todos.slice(0, limite);
 
   el.listaFixas.innerHTML = items.map(item => `
     <div class="list-item">
@@ -383,14 +409,28 @@ function renderFixas() {
       </div>
     </div>
   `).join('');
+
+  atualizarBotaoVerMais('btnVerMaisFixas', todos.length, limite, 'fixas');
 }
 
-// ── ATUALIZADO: botão Excluir nos cartões ───────────────────────────────────
 function renderCartoes() {
   if (!el.listaCartoes) return;
+
+  const todosCartoes = state.cartoes || [];
+  const todasFaturas = state.faturas || [];
+  const totalItens = todosCartoes.length + todasFaturas.length;
+
+  if (!totalItens) {
+    el.listaCartoes.innerHTML = `<div class="empty-state">Nenhum cartão cadastrado.</div>`;
+    atualizarBotaoVerMais('btnVerMaisCartoes', 0, 0, 'cartoes');
+    return;
+  }
+
+  const limite = expanded.cartoes ? totalItens : ITEMS_VISIVEIS.cartoes;
   const cards = [];
 
-  (state.cartoes || []).forEach(c => {
+  for (const c of todosCartoes) {
+    if (cards.length >= limite) break;
     cards.push(`
       <div class="list-item">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
@@ -405,9 +445,10 @@ function renderCartoes() {
         </div>
       </div>
     `);
-  });
+  }
 
-  (state.faturas || []).forEach(f => {
+  for (const f of todasFaturas) {
+    if (cards.length >= limite) break;
     cards.push(`
       <div class="list-item">
         <div class="list-item-title">Fatura ${escapeHtml(f.nome_cartao)}</div>
@@ -415,14 +456,35 @@ function renderCartoes() {
         <div class="list-item-title" style="margin-top:8px;">${money(f.valor_total)}</div>
       </div>
     `);
-  });
-
-  if (!cards.length) {
-    el.listaCartoes.innerHTML = `<div class="empty-state">Nenhum cartão cadastrado.</div>`;
-    return;
   }
 
   el.listaCartoes.innerHTML = cards.join('');
+  atualizarBotaoVerMais('btnVerMaisCartoes', totalItens, cards.length, 'cartoes');
+}
+
+// Atualiza o texto e visibilidade do botão "Ver mais / Ver menos"
+function atualizarBotaoVerMais(btnId, total, exibindo, secao) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+
+  if (total <= ITEMS_VISIVEIS[secao]) {
+    btn.style.display = 'none';
+    return;
+  }
+
+  btn.style.display = '';
+  const restante = total - exibindo;
+  btn.textContent = expanded[secao]
+    ? 'Ver menos'
+    : `Ver mais (${restante} oculto${restante !== 1 ? 's' : ''})`;
+}
+
+function toggleVerMais(secao) {
+  expanded[secao] = !expanded[secao];
+
+  if (secao === 'lancamentos') renderLancamentos();
+  if (secao === 'fixas') renderFixas();
+  if (secao === 'cartoes') renderCartoes();
 }
 
 function filteredLancamentos() {
@@ -544,8 +606,6 @@ async function postAction(action, data) {
   return json;
 }
 
-// ── NOVAS FUNÇÕES DE EXCLUSÃO ────────────────────────────────────────────────
-
 async function deleteLancamento(id) {
   if (!confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
   try {
@@ -575,8 +635,6 @@ async function deleteCartao(id) {
     alert('Erro ao excluir cartão: ' + err.message);
   }
 }
-
-// ── UTILITÁRIOS ──────────────────────────────────────────────────────────────
 
 function fillSelect(select, values, placeholder, cartaoComTexto = false) {
   if (!select) return;
@@ -627,7 +685,6 @@ function closeModal(id) {
   if (modal) modal.style.display = 'none';
 }
 
-// ── EXPOR GLOBALMENTE ────────────────────────────────────────────────────────
 window.openLancamentoModal = openLancamentoModal;
 window.openFixaModal = openFixaModal;
 window.openCartaoModal = openCartaoModal;
@@ -637,6 +694,7 @@ window.editLancamento = editLancamento;
 window.deleteLancamento = deleteLancamento;
 window.deleteFixa = deleteFixa;
 window.deleteCartao = deleteCartao;
+window.toggleVerMais = toggleVerMais;
 
 function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
