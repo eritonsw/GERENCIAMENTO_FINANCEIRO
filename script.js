@@ -520,31 +520,54 @@ function filteredLancamentos() {
 
 async function onSaveLancamento(ev) {
   ev.preventDefault();
-  const data = Object.fromEntries(new FormData(el.formLancamento).entries());
-  const editing = Boolean(data.id_lancamento);
 
-  if (data.forma_pagamento === 'Crédito') {
-    if (!data.id_cartao) {
-      alert('Selecione um cartão.');
-      return;
+  const btnSalvar = document.getElementById('btnSalvarLancamento');
+  const textoOriginal = btnSalvar ? btnSalvar.textContent : 'Salvar';
+
+  try {
+    if (btnSalvar) {
+      btnSalvar.disabled = true;
+      btnSalvar.textContent = 'Salvando...';
     }
-    const [idCartao, nomeCartao] = String(data.id_cartao).split('||');
-    data.id_cartao = idCartao || '';
-    data.conta_pagamento = nomeCartao || '';
-  } else {
-    data.id_cartao = '';
-    data.parcelado = 'nao';
-    data.total_parcelas = 1;
+
+    const data = Object.fromEntries(new FormData(el.formLancamento).entries());
+    const editing = Boolean(data.id_lancamento);
+
+    if (data.forma_pagamento === 'Crédito') {
+      if (!data.id_cartao) {
+        throw new Error('Selecione um cartão.');
+      }
+
+      const [idCartao, nomeCartao] = String(data.id_cartao).split('||');
+      data.id_cartao = idCartao || '';
+      data.conta_pagamento = nomeCartao || '';
+    } else {
+      data.id_cartao = '';
+      data.parcelado = 'nao';
+      data.total_parcelas = 1;
+    }
+
+    if (data.parcelado !== 'sim') {
+      data.total_parcelas = 1;
+    }
+
+    const action = editing ? 'updateLancamento' : 'saveLancamento';
+
+    await postAction(action, data);
+
+    resetLancamentoForm();
+    closeModal('modalLancamento');
+    await loadDashboard();
+    alert(editing ? 'Lançamento atualizado com sucesso.' : 'Lançamento salvo com sucesso.');
+  } catch (err) {
+    alert('Erro ao salvar lançamento: ' + (err.message || err));
+    console.error('Erro ao salvar lançamento:', err);
+  } finally {
+    if (btnSalvar) {
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = textoOriginal;
+    }
   }
-
-  if (data.parcelado !== 'sim') data.total_parcelas = 1;
-
-  const action = editing ? 'updateLancamento' : 'saveLancamento';
-  await postAction(action, data);
-
-  resetLancamentoForm();
-  closeModal('modalLancamento');
-  await loadDashboard();
 }
 
 async function onSaveFixa(ev) {
@@ -615,20 +638,27 @@ async function postAction(action, data) {
   const body = new URLSearchParams();
   body.append('payload', JSON.stringify(payload));
 
-  const res = await fetch(API_URL, { method: 'POST', body });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Falha ao salvar');
-  return json;
-}
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    body,
+    redirect: 'follow'
+  });
 
-async function deleteLancamento(id) {
-  if (!confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
+  const raw = await res.text();
+
+  let json;
   try {
-    await postAction('deleteLancamento', { id_lancamento: id });
-    await loadDashboard();
-  } catch (err) {
-    alert('Erro ao excluir lançamento: ' + err.message);
+    json = JSON.parse(raw);
+  } catch (e) {
+    console.error('Resposta bruta do servidor:', raw);
+    throw new Error('O servidor não retornou JSON válido. Verifique a implantação do Apps Script.');
   }
+
+  if (!json.ok) {
+    throw new Error(json.error || 'Falha ao salvar');
+  }
+
+  return json;
 }
 
 async function deleteFixa(id) {
