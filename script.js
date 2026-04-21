@@ -241,7 +241,9 @@ function updatePagamentoFields() {
   el.fieldConta?.classList.toggle('hidden', isCredito);
   el.fieldCartao?.classList.toggle('hidden', !isCredito);
   el.fieldParcelado?.classList.toggle('hidden', !isCredito || editing);
-  el.fieldTotalParcelas?.classList.toggle('hidden', !isCredito || parcelado !== 'sim' || editing);
+
+  const mostrarParcelas = isCredito && parcelado === 'sim' && !editing;
+  el.fieldTotalParcelas?.classList.toggle('hidden', !mostrarParcelas);
 
   if (!isCredito) {
     if (el.lancCartao) el.lancCartao.value = '';
@@ -249,8 +251,18 @@ function updatePagamentoFields() {
     if (el.lancTotalParcelas && !editing) el.lancTotalParcelas.value = 1;
   }
 
-  if (isCredito && parcelado !== 'sim' && el.lancTotalParcelas && !editing) {
-    el.lancTotalParcelas.value = 1;
+  if (el.lancTotalParcelas) {
+    if (mostrarParcelas) {
+      el.lancTotalParcelas.min = 2;
+      el.lancTotalParcelas.required = true;
+      if (Number(el.lancTotalParcelas.value || 0) < 2) {
+        el.lancTotalParcelas.value = 2;
+      }
+    } else {
+      el.lancTotalParcelas.min = 1;
+      el.lancTotalParcelas.required = false;
+      el.lancTotalParcelas.value = 1;
+    }
   }
 }
 
@@ -541,13 +553,16 @@ async function onSaveLancamento(ev) {
       const [idCartao, nomeCartao] = String(data.id_cartao).split('||');
       data.id_cartao = idCartao || '';
       data.conta_pagamento = nomeCartao || '';
+
+      if (data.parcelado !== 'sim') {
+        data.parcelado = 'nao';
+        data.total_parcelas = 1;
+      } else {
+        data.total_parcelas = Math.max(2, parseInt(data.total_parcelas || '2', 10));
+      }
     } else {
       data.id_cartao = '';
       data.parcelado = 'nao';
-      data.total_parcelas = 1;
-    }
-
-    if (data.parcelado !== 'sim') {
       data.total_parcelas = 1;
     }
 
@@ -558,7 +573,6 @@ async function onSaveLancamento(ev) {
     resetLancamentoForm();
     closeModal('modalLancamento');
     await loadDashboard();
-    alert(editing ? 'Lançamento atualizado com sucesso.' : 'Lançamento salvo com sucesso.');
   } catch (err) {
     alert('Erro ao salvar lançamento: ' + (err.message || err));
     console.error('Erro ao salvar lançamento:', err);
@@ -569,7 +583,6 @@ async function onSaveLancamento(ev) {
     }
   }
 }
-
 async function onSaveFixa(ev) {
   ev.preventDefault();
   const data = Object.fromEntries(new FormData(el.formFixa).entries());
@@ -586,6 +599,16 @@ async function onSaveCartao(ev) {
   el.formCartao.reset();
   closeModal('modalCartao');
   await loadDashboard();
+}
+
+async function deleteLancamento(id) {
+  if (!confirm('Excluir este lançamento? Esta ação não pode ser desfeita.')) return;
+  try {
+    await postAction('deleteLancamento', { id_lancamento: id });
+    await loadDashboard();
+  } catch (err) {
+    alert('Erro ao excluir lançamento: ' + err.message);
+  }
 }
 
 function editLancamento(id) {
